@@ -1,13 +1,16 @@
 <script>
     /**
      * ========================================
-     * PMO INTAKE DASHBOARD - CLIENT-SIDE LOGIC
+     * PMO INTAKE DASHBOARD - TASK MANAGEMENT WORKSPACE
      * ========================================
      */
 
     // Global state
     let currentTab = 'DB_ADHOCS';
+    let currentView = 'myTasks'; // 'myTasks' or 'allRequests'
     let currentData = null;
+    let teamMembers = [];
+    let userEmail = '';
 
     // Initialize on page load
     window.addEventListener('DOMContentLoaded', function () {
@@ -18,16 +21,47 @@
      * Initialize the dashboard
      */
     function initializeDashboard() {
-        // Set user email
-        const userEmail = '<?= userEmail ?>';
-        document.getElementById('userEmail').textContent = userEmail;
+        // Set user email from server - get it from the server instead
+        google.script.run
+            .withSuccessHandler(function (email) {
+                userEmail = email;
+                document.getElementById('userEmail').textContent = userEmail;
 
-        // Set user avatar (first letter of email)
-        const firstLetter = userEmail.charAt(0).toUpperCase();
-        document.getElementById('userAvatar').textContent = firstLetter;
+                // Set user avatar (first letter of email)
+                const firstLetter = userEmail.charAt(0).toUpperCase();
+                document.getElementById('userAvatar').textContent = firstLetter;
 
-        // Load initial data
-        loadData(currentTab);
+                // Now load team members and data
+                loadTeamMembersAndData();
+            })
+            .withFailureHandler(function (error) {
+                console.error('Error getting user email:', error);
+                userEmail = 'unknown@ucsd.edu';
+                document.getElementById('userEmail').textContent = 'Error loading email';
+                // Still try to load data
+                loadTeamMembersAndData();
+            })
+            .getUserEmail();
+    }
+
+    /**
+     * Load team members and initial data
+     * Called after user email is retrieved
+     */
+    function loadTeamMembersAndData() {
+        // Load team members
+        google.script.run
+            .withSuccessHandler(function (members) {
+                teamMembers = members;
+                // Load initial data after team members are loaded
+                loadData(currentTab);
+            })
+            .withFailureHandler(function (error) {
+                console.error('Error loading team members:', error);
+                // Load data anyway with empty team list
+                loadData(currentTab);
+            })
+            .getTeamMembers();
     }
 
     /**
@@ -49,12 +83,45 @@
         // Update current tab
         currentTab = tabName;
 
+        // Show/hide view switcher (only for Ad Hoc Requests)
+        const viewSwitcher = document.getElementById('viewSwitcher');
+        if (tabName === 'DB_ADHOCS') {
+            viewSwitcher.style.display = 'flex';
+        } else {
+            viewSwitcher.style.display = 'none';
+        }
+
         // Update content title
         const title = tabName === 'DB_ADHOCS' ? 'Ad Hoc Requests' : 'Project Requests';
         document.getElementById('contentTitle').textContent = title;
 
         // Load data
         loadData(tabName);
+    }
+
+    /**
+     * Switch between views (My Active Tasks vs All Requests)
+     * @param {string} viewName - Name of the view
+     */
+    function switchView(viewName) {
+        // Update active state
+        document.querySelectorAll('.view-button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+
+        const activeButton = viewName === 'myTasks' ?
+            document.getElementById('view-myTasks') :
+            document.getElementById('view-allRequests');
+
+        activeButton.classList.add('active');
+
+        // Update current view
+        currentView = viewName;
+
+        // Re-render table with filtered data
+        if (currentData) {
+            renderTable(currentData);
+        }
     }
 
     /**
@@ -88,9 +155,6 @@
             return;
         }
 
-        // Update record count
-        document.getElementById('recordCount').textContent = `${data.rows.length} Record${data.rows.length !== 1 ? 's' : ''}`;
-
         // Render table
         renderTable(data);
     }
@@ -106,6 +170,53 @@
     }
 
     /**
+     * Filter data based on current view
+     * @param {Object} data - Original data
+     * @returns {Object} Filtered data
+     */
+    function filterData(data) {
+        // Only filter for Ad Hoc Requests in "My Active Tasks" view
+        if (currentTab !== 'DB_ADHOCS' || currentView !== 'myTasks') {
+            console.log('Not filtering - currentTab:', currentTab, 'currentView:', currentView);
+            return data;
+        }
+
+        console.log('Filter Debug - Current user email:', userEmail);
+
+        const assigneeIndex = data.headers.indexOf('Assignee');
+        const statusIndex = data.headers.indexOf('Status');
+
+        if (assigneeIndex === -1 || statusIndex === -1) {
+            console.warn('Missing required columns - Assignee index:', assigneeIndex, 'Status index:', statusIndex);
+            return data;
+        }
+
+        // Filter rows where Assignee matches current user AND Status is not "Completed"
+        const filteredRows = data.rows.filter(row => {
+            const assignee = row[assigneeIndex];
+            const status = row[statusIndex];
+
+            // Match assignee (case-insensitive, partial match on email)
+            const isMyTask = assignee && assignee.toLowerCase().includes(userEmail.toLowerCase());
+            const isNotCompleted = status !== 'Completed';
+
+            // Debug log for each row
+            if (assignee) {
+                console.log(`Row - Assignee: "${assignee}", Status: "${status}", Match: ${isMyTask}, NotCompleted: ${isNotCompleted}`);
+            }
+
+            return isMyTask && isNotCompleted;
+        });
+
+        console.log(`✅ Filtered ${filteredRows.length} rows from ${data.rows.length} total rows`);
+
+        return {
+            headers: data.headers,
+            rows: filteredRows
+        };
+    }
+
+    /**
      * Render the data table
      * @param {Object} data - Data object with headers and rows
      */
@@ -114,32 +225,113 @@
         const tableBody = document.getElementById('tableBody');
         const tableContainer = document.getElementById('tableContainer');
 
+        // Filter data based on current view
+        const filteredData = filterData(data);
+
+        // Update record count
+        document.getElementById('recordCount').textContent =
+            `${filteredData.rows.length} Record${filteredData.rows.length !== 1 ? 's' : ''}`;
+
+        // Check if filtered data is empty
+        if (filteredData.rows.length === 0) {
+            showEmptyState();
+            return;
+        }
+
         // Clear existing content
         tableHead.innerHTML = '';
         tableBody.innerHTML = '';
 
+        // Reorder headers for Ad Hoc Requests to prioritize task management columns
+        let orderedHeaders = [...data.headers];
+        let headerIndexMap = {};
+
+        if (currentTab === 'DB_ADHOCS') {
+            // Define priority order
+            const priorityColumns = ['Assignee', 'Status', 'Deliverable Evidence', 'Hard Deadline', 'The Request'];
+            const reorderedHeaders = [];
+            const usedIndices = new Set();
+
+            // Add priority columns first
+            priorityColumns.forEach(col => {
+                const index = data.headers.indexOf(col);
+                if (index !== -1) {
+                    reorderedHeaders.push(col);
+                    headerIndexMap[col] = index;
+                    usedIndices.add(index);
+                }
+            });
+
+            // Add remaining columns
+            data.headers.forEach((header, index) => {
+                if (!usedIndices.has(index)) {
+                    reorderedHeaders.push(header);
+                    headerIndexMap[header] = index;
+                }
+            });
+
+            orderedHeaders = reorderedHeaders;
+        } else {
+            // For other tabs, keep original order
+            data.headers.forEach((header, index) => {
+                headerIndexMap[header] = index;
+            });
+        }
+
         // Create header row
         const headerRow = document.createElement('tr');
-        data.headers.forEach(header => {
+        orderedHeaders.forEach(header => {
             const th = document.createElement('th');
             th.textContent = header;
+
+            // Add column-specific classes
+            if (header === 'Assignee') th.classList.add('col-assignee');
+            if (header === 'Status') th.classList.add('col-status');
+            if (header === 'Deliverable Evidence') th.classList.add('col-deliverable');
+            if (header === 'Hard Deadline') th.classList.add('col-deadline');
+            if (header === 'The Request') th.classList.add('col-request');
+
             headerRow.appendChild(th);
         });
         tableHead.appendChild(headerRow);
 
         // Create data rows
-        data.rows.forEach((row, rowIndex) => {
+        filteredData.rows.forEach((row, rowIndex) => {
             const tr = document.createElement('tr');
+            tr.dataset.rowIndex = rowIndex;
 
-            row.forEach((cell, cellIndex) => {
+            orderedHeaders.forEach(header => {
+                const cellIndex = headerIndexMap[header];
+                const cell = row[cellIndex];
                 const td = document.createElement('td');
-                const header = data.headers[cellIndex];
 
-                // Format cell based on column type
-                td.innerHTML = formatCell(cell, header);
+                // Add column-specific classes
+                if (header === 'Assignee') td.classList.add('col-assignee');
+                if (header === 'Status') td.classList.add('col-status');
+                if (header === 'Deliverable Evidence') td.classList.add('col-deliverable');
+                if (header === 'Hard Deadline') td.classList.add('col-deadline');
+                if (header === 'The Request') td.classList.add('col-request');
+
+                // Render interactive or formatted cell
+                if (currentTab === 'DB_ADHOCS') {
+                    if (header === 'Assignee') {
+                        td.innerHTML = renderAssigneeDropdown(cell, rowIndex);
+                    } else if (header === 'Status') {
+                        td.innerHTML = renderStatusDropdown(cell, rowIndex, row[headerIndexMap['Deliverable Evidence']]);
+                    } else if (header === 'Deliverable Evidence') {
+                        td.innerHTML = renderDeliverableInput(cell, rowIndex);
+                    } else if (header === 'Hard Deadline') {
+                        td.innerHTML = formatDeadline(cell);
+                    } else {
+                        td.innerHTML = formatCell(cell, header);
+                    }
+                } else {
+                    td.innerHTML = formatCell(cell, header);
+                }
 
                 // Add truncate class for long text
-                if (typeof cell === 'string' && cell.length > 50) {
+                if (typeof cell === 'string' && cell.length > 50 &&
+                    header !== 'Assignee' && header !== 'Status' && header !== 'Deliverable Evidence') {
                     td.classList.add('text-truncate');
                     td.title = cell; // Show full text on hover
                 }
@@ -156,6 +348,220 @@
     }
 
     /**
+     * Render assignee dropdown
+     * @param {string} value - Current assignee
+     * @param {number} rowIndex - Row index
+     * @returns {string} HTML for dropdown
+     */
+    function renderAssigneeDropdown(value, rowIndex) {
+        const options = teamMembers.map(member => {
+            const selected = member === value ? 'selected' : '';
+            return `<option value="${escapeHtml(member)}" ${selected}>${escapeHtml(member)}</option>`;
+        }).join('');
+
+        return `<select class="editable-select" onchange="updateAssignee(${rowIndex}, this.value)">${options}</select>`;
+    }
+
+    /**
+     * Render status dropdown
+     * @param {string} value - Current status
+     * @param {number} rowIndex - Row index
+     * @param {string} deliverableEvidence - Current deliverable evidence value
+     * @returns {string} HTML for dropdown
+     */
+    function renderStatusDropdown(value, rowIndex, deliverableEvidence) {
+        const statuses = ['New', 'In Progress', 'Completed'];
+        const statusClass = getStatusSelectClass(value);
+
+        const options = statuses.map(status => {
+            const selected = status === value ? 'selected' : '';
+            // Disable "Completed" if no deliverable evidence
+            const disabled = (status === 'Completed' && (!deliverableEvidence || deliverableEvidence.trim() === '')) ? 'disabled' : '';
+            return `<option value="${status}" ${selected} ${disabled}>${status}</option>`;
+        }).join('');
+
+        return `<select class="editable-select ${statusClass}" 
+                        onchange="updateStatus(${rowIndex}, this.value)" 
+                        data-row-index="${rowIndex}">${options}</select>`;
+    }
+
+    /**
+     * Render deliverable evidence input
+     * @param {string} value - Current value
+     * @param {number} rowIndex - Row index
+     * @returns {string} HTML for input
+     */
+    function renderDeliverableInput(value, rowIndex) {
+        const displayValue = value || '';
+        return `<input type="text" 
+                       class="editable-input" 
+                       value="${escapeHtml(displayValue)}" 
+                       placeholder="Paste link to deliverable..."
+                       onblur="updateDeliverable(${rowIndex}, this.value)"
+                       data-row-index="${rowIndex}">`;
+    }
+
+    /**
+     * Format deadline with urgency highlighting
+     * @param {string} dateStr - Date string
+     * @returns {string} Formatted HTML
+     */
+    function formatDeadline(dateStr) {
+        if (!dateStr) return '<span style="color: var(--gray-light);">—</span>';
+
+        try {
+            const deadline = new Date(dateStr);
+            if (isNaN(deadline.getTime())) return escapeHtml(dateStr);
+
+            const now = new Date();
+            const diffMs = deadline - now;
+            const diffHours = diffMs / (1000 * 60 * 60);
+            const diffDays = diffHours / 24;
+
+            let className = 'deadline-normal';
+            let urgencyLabel = '';
+
+            if (diffHours < 0) {
+                className = 'deadline-critical';
+                urgencyLabel = ' ⚠️ OVERDUE';
+            } else if (diffHours <= 48) {
+                className = 'deadline-critical';
+                urgencyLabel = ' 🔥 48h';
+            } else if (diffDays <= 7) {
+                className = 'deadline-warning';
+                urgencyLabel = ' ⚡ 1 week';
+            }
+
+            const formattedDate = deadline.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: deadline.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+            });
+
+            return `<span class="${className}">${formattedDate}${urgencyLabel}</span>`;
+        } catch (e) {
+            return escapeHtml(dateStr);
+        }
+    }
+
+    /**
+     * Get status select class based on value
+     * @param {string} status - Status value
+     * @returns {string} CSS class
+     */
+    function getStatusSelectClass(status) {
+        const statusLower = String(status).toLowerCase();
+        if (statusLower.includes('new')) return 'status-select-new';
+        if (statusLower.includes('progress')) return 'status-select-in-progress';
+        if (statusLower.includes('complete')) return 'status-select-completed';
+        return '';
+    }
+
+    /**
+     * Update assignee
+     * @param {number} rowIndex - Row index
+     * @param {string} newValue - New assignee value
+     */
+    function updateAssignee(rowIndex, newValue) {
+        updateField(rowIndex, 'Assignee', newValue);
+    }
+
+    /**
+     * Update status with validation
+     * @param {number} rowIndex - Row index
+     * @param {string} newValue - New status value
+     */
+    function updateStatus(rowIndex, newValue) {
+        const deliverableIndex = currentData.headers.indexOf('Deliverable Evidence');
+        const deliverableValue = currentData.rows[rowIndex][deliverableIndex];
+
+        // Validate on client side
+        if (newValue === 'Completed' && (!deliverableValue || deliverableValue.trim() === '')) {
+            showError('Cannot mark as Completed without Deliverable Evidence. Please provide a link to the final output.');
+
+            // Reset dropdown to previous value
+            const statusIndex = currentData.headers.indexOf('Status');
+            const previousValue = currentData.rows[rowIndex][statusIndex];
+            const select = document.querySelector(`select[data-row-index="${rowIndex}"]`);
+            if (select) {
+                select.value = previousValue;
+            }
+            return;
+        }
+
+        updateField(rowIndex, 'Status', newValue, function () {
+            // Update the dropdown class after successful update
+            const select = document.querySelector(`select[data-row-index="${rowIndex}"]`);
+            if (select) {
+                select.className = 'editable-select ' + getStatusSelectClass(newValue);
+            }
+
+            // If marked as completed, refresh to remove from "My Active Tasks" view
+            if (newValue === 'Completed' && currentView === 'myTasks') {
+                setTimeout(() => loadData(currentTab), 500);
+            }
+        });
+    }
+
+    /**
+     * Update deliverable evidence
+     * @param {number} rowIndex - Row index
+     * @param {string} newValue - New deliverable value
+     */
+    function updateDeliverable(rowIndex, newValue) {
+        updateField(rowIndex, 'Deliverable Evidence', newValue, function () {
+            // Re-enable "Completed" option in status dropdown if deliverable is now provided
+            if (newValue && newValue.trim() !== '') {
+                const statusSelect = document.querySelector(`select.editable-select[data-row-index="${rowIndex}"]`);
+                if (statusSelect) {
+                    const completedOption = statusSelect.querySelector('option[value="Completed"]');
+                    if (completedOption) {
+                        completedOption.disabled = false;
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Generic field update function
+     * @param {number} rowIndex - Row index
+     * @param {string} columnName - Column name
+     * @param {string} newValue - New value
+     * @param {Function} callback - Optional callback after successful update
+     */
+    function updateField(rowIndex, columnName, newValue, callback) {
+        const updates = {};
+        updates[columnName] = newValue;
+
+        // Show loading indicator (optional)
+        console.log(`Updating ${columnName} to "${newValue}" for row ${rowIndex}`);
+
+        google.script.run
+            .withSuccessHandler(function (success) {
+                if (success) {
+                    // Update local data
+                    const colIndex = currentData.headers.indexOf(columnName);
+                    if (colIndex !== -1) {
+                        currentData.rows[rowIndex][colIndex] = newValue;
+                    }
+
+                    // Execute callback if provided
+                    if (callback) callback();
+
+                    console.log(`Successfully updated ${columnName}`);
+                } else {
+                    showError(`Failed to update ${columnName}`);
+                }
+            })
+            .withFailureHandler(function (error) {
+                showError(`Error updating ${columnName}: ${error.message}`);
+                console.error('Update error:', error);
+            })
+            .updateRow(currentTab, rowIndex + 1, updates);
+    }
+
+    /**
      * Format cell content based on column type
      * @param {*} value - Cell value
      * @param {string} header - Column header
@@ -167,7 +573,7 @@
             return '<span style="color: var(--gray-light);">—</span>';
         }
 
-        // Status column
+        // Status column (for non-editable views)
         if (header === 'Status') {
             const statusClass = getStatusClass(value);
             return `<span class="status-badge ${statusClass}">${value}</span>`;
@@ -184,8 +590,8 @@
             return `<a href="mailto:${value}" style="color: var(--primary); text-decoration: none;">${value}</a>`;
         }
 
-        // Date columns
-        if (header.includes('Date') || header.includes('Timestamp') || header.includes('Modified')) {
+        // Date columns (except Hard Deadline which is handled separately)
+        if ((header.includes('Date') || header.includes('Timestamp') || header.includes('Modified')) && header !== 'Hard Deadline') {
             return formatDate(value);
         }
 
@@ -310,6 +716,11 @@
         const errorDiv = document.getElementById('errorMessage');
         errorDiv.textContent = `⚠️ ${message}`;
         errorDiv.classList.remove('hidden');
+
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            errorDiv.classList.add('hidden');
+        }, 5000);
     }
 
     /**

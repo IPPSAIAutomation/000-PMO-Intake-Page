@@ -60,9 +60,23 @@ const CONFIG = {
   METADATA: {
     DEFAULT_STATUS: 'New',
     STATUS_COLUMN: 'Status',
+    ASSIGNEE_COLUMN: 'Assignee',
+    DELIVERABLE_EVIDENCE_COLUMN: 'Deliverable Evidence',
     LAST_MODIFIED_COLUMN: 'Last Modified',
     MODIFIED_BY_COLUMN: 'Modified By'
   },
+  
+  // Team Members for Assignee Dropdown
+  TEAM_MEMBERS: [
+    'Unassigned',
+    'ipalacio@ucsd.edu',
+    'k9thomas@UCSD.EDU',
+    'cal050@UCSD.EDU'
+    // TODO: Update this list with your actual team members
+  ],
+  
+  // Status Options
+  STATUS_OPTIONS: ['New', 'In Progress', 'Completed'],
   
   // Date Format
   DATE_FORMAT: 'MM/dd/yyyy HH:mm:ss'
@@ -303,6 +317,39 @@ function getData(tabName) {
     throw error;
   }
 }
+
+/**
+ * Get team members list
+ * @returns {Array} List of team members
+ */
+function getTeamMembers() {
+  return CONFIG.TEAM_MEMBERS;
+}
+
+/**
+ * Get current user's email
+ * @returns {string} User email
+ */
+function getUserEmail() {
+  return Session.getActiveUser().getEmail();
+}
+
+/**
+ * Validate status update
+ * @param {string} newStatus - New status value
+ * @param {string} deliverableEvidence - Deliverable evidence value
+ * @returns {Object} Validation result
+ */
+function validateStatusUpdate(newStatus, deliverableEvidence) {
+  if (newStatus === 'Completed' && (!deliverableEvidence || deliverableEvidence.trim() === '')) {
+    return {
+      valid: false,
+      message: 'Cannot mark as Completed without Deliverable Evidence. Please provide a link to the final output.'
+    };
+  }
+  return { valid: true };
+}
+
 
 /**
  * Update a row in the specified tab
