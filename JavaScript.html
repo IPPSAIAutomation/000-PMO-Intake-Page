@@ -247,12 +247,19 @@
         let headerIndexMap = {};
 
         if (currentTab === 'DB_ADHOCS') {
-            // Define priority order
+            // Define columns to hide (administrative/audit columns)
+            const hiddenColumns = ['Last Modified', 'Modified By'];
+
+            // Define priority order (actionable columns first)
             const priorityColumns = ['Assignee', 'Status', 'Deliverable Evidence', 'Hard Deadline', 'The Request'];
+
+            // Define columns to move to the end
+            const deprioritizedColumns = ['Timestamp', 'Email Address'];
+
             const reorderedHeaders = [];
             const usedIndices = new Set();
 
-            // Add priority columns first
+            // Step 1: Add priority columns first
             priorityColumns.forEach(col => {
                 const index = data.headers.indexOf(col);
                 if (index !== -1) {
@@ -262,13 +269,30 @@
                 }
             });
 
-            // Add remaining columns
+            // Step 2: Add remaining columns (excluding hidden and deprioritized)
             data.headers.forEach((header, index) => {
-                if (!usedIndices.has(index)) {
+                if (!usedIndices.has(index) &&
+                    !hiddenColumns.includes(header) &&
+                    !deprioritizedColumns.includes(header)) {
                     reorderedHeaders.push(header);
                     headerIndexMap[header] = index;
+                    usedIndices.add(index);
                 }
             });
+
+            // Step 3: Add deprioritized columns at the end
+            deprioritizedColumns.forEach(col => {
+                const index = data.headers.indexOf(col);
+                if (index !== -1 && !usedIndices.has(index)) {
+                    reorderedHeaders.push(col);
+                    headerIndexMap[col] = index;
+                    usedIndices.add(index);
+                }
+            });
+
+            // Note: hiddenColumns are intentionally not added to reorderedHeaders
+            console.log('Column order:', reorderedHeaders);
+            console.log('Hidden columns:', hiddenColumns);
 
             orderedHeaders = reorderedHeaders;
         } else {
