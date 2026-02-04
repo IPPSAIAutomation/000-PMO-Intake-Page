@@ -1,0 +1,324 @@
+<script>
+    /**
+     * ========================================
+     * PMO INTAKE DASHBOARD - CLIENT-SIDE LOGIC
+     * ========================================
+     */
+
+    // Global state
+    let currentTab = 'DB_ADHOCS';
+    let currentData = null;
+
+    // Initialize on page load
+    window.addEventListener('DOMContentLoaded', function () {
+        initializeDashboard();
+    });
+
+    /**
+     * Initialize the dashboard
+     */
+    function initializeDashboard() {
+        // Set user email
+        const userEmail = '<?= userEmail ?>';
+        document.getElementById('userEmail').textContent = userEmail;
+
+        // Set user avatar (first letter of email)
+        const firstLetter = userEmail.charAt(0).toUpperCase();
+        document.getElementById('userAvatar').textContent = firstLetter;
+
+        // Load initial data
+        loadData(currentTab);
+    }
+
+    /**
+     * Switch between tabs
+     * @param {string} tabName - Name of the tab to switch to
+     */
+    function switchTab(tabName) {
+        // Update active state
+        document.querySelectorAll('.tab-button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+
+        const activeButton = tabName === 'DB_ADHOCS' ?
+            document.getElementById('tab-adhocs') :
+            document.getElementById('tab-projects');
+
+        activeButton.classList.add('active');
+
+        // Update current tab
+        currentTab = tabName;
+
+        // Update content title
+        const title = tabName === 'DB_ADHOCS' ? 'Ad Hoc Requests' : 'Project Requests';
+        document.getElementById('contentTitle').textContent = title;
+
+        // Load data
+        loadData(tabName);
+    }
+
+    /**
+     * Load data from the server
+     * @param {string} tabName - Name of the tab to load data from
+     */
+    function loadData(tabName) {
+        // Show loading state
+        showLoading();
+
+        // Call server-side function
+        google.script.run
+            .withSuccessHandler(onDataLoaded)
+            .withFailureHandler(onDataError)
+            .getData(tabName);
+    }
+
+    /**
+     * Handle successful data load
+     * @param {Object} data - Data object with headers and rows
+     */
+    function onDataLoaded(data) {
+        currentData = data;
+
+        // Hide loading state
+        hideLoading();
+
+        // Check if data is empty
+        if (!data.rows || data.rows.length === 0) {
+            showEmptyState();
+            return;
+        }
+
+        // Update record count
+        document.getElementById('recordCount').textContent = `${data.rows.length} Record${data.rows.length !== 1 ? 's' : ''}`;
+
+        // Render table
+        renderTable(data);
+    }
+
+    /**
+     * Handle data load error
+     * @param {Error} error - Error object
+     */
+    function onDataError(error) {
+        hideLoading();
+        showError(error.message || 'Failed to load data. Please try again.');
+        console.error('Error loading data:', error);
+    }
+
+    /**
+     * Render the data table
+     * @param {Object} data - Data object with headers and rows
+     */
+    function renderTable(data) {
+        const tableHead = document.getElementById('tableHead');
+        const tableBody = document.getElementById('tableBody');
+        const tableContainer = document.getElementById('tableContainer');
+
+        // Clear existing content
+        tableHead.innerHTML = '';
+        tableBody.innerHTML = '';
+
+        // Create header row
+        const headerRow = document.createElement('tr');
+        data.headers.forEach(header => {
+            const th = document.createElement('th');
+            th.textContent = header;
+            headerRow.appendChild(th);
+        });
+        tableHead.appendChild(headerRow);
+
+        // Create data rows
+        data.rows.forEach((row, rowIndex) => {
+            const tr = document.createElement('tr');
+
+            row.forEach((cell, cellIndex) => {
+                const td = document.createElement('td');
+                const header = data.headers[cellIndex];
+
+                // Format cell based on column type
+                td.innerHTML = formatCell(cell, header);
+
+                // Add truncate class for long text
+                if (typeof cell === 'string' && cell.length > 50) {
+                    td.classList.add('text-truncate');
+                    td.title = cell; // Show full text on hover
+                }
+
+                tr.appendChild(td);
+            });
+
+            tableBody.appendChild(tr);
+        });
+
+        // Show table
+        tableContainer.classList.remove('hidden');
+        document.getElementById('emptyState').classList.add('hidden');
+    }
+
+    /**
+     * Format cell content based on column type
+     * @param {*} value - Cell value
+     * @param {string} header - Column header
+     * @returns {string} Formatted HTML
+     */
+    function formatCell(value, header) {
+        // Handle empty values
+        if (value === null || value === undefined || value === '') {
+            return '<span style="color: var(--gray-light);">—</span>';
+        }
+
+        // Status column
+        if (header === 'Status') {
+            const statusClass = getStatusClass(value);
+            return `<span class="status-badge ${statusClass}">${value}</span>`;
+        }
+
+        // Priority column
+        if (header === 'Priority') {
+            const priorityClass = getPriorityClass(value);
+            return `<span class="${priorityClass}">${value}</span>`;
+        }
+
+        // Email columns
+        if (header.includes('Email')) {
+            return `<a href="mailto:${value}" style="color: var(--primary); text-decoration: none;">${value}</a>`;
+        }
+
+        // Date columns
+        if (header.includes('Date') || header.includes('Timestamp') || header.includes('Modified')) {
+            return formatDate(value);
+        }
+
+        // Default
+        return escapeHtml(String(value));
+    }
+
+    /**
+     * Get status badge class
+     * @param {string} status - Status value
+     * @returns {string} CSS class name
+     */
+    function getStatusClass(status) {
+        const statusLower = String(status).toLowerCase();
+
+        if (statusLower.includes('new')) return 'status-new';
+        if (statusLower.includes('progress') || statusLower.includes('active')) return 'status-in-progress';
+        if (statusLower.includes('complete') || statusLower.includes('done')) return 'status-completed';
+        if (statusLower.includes('hold') || statusLower.includes('pending')) return 'status-on-hold';
+
+        return 'status-new';
+    }
+
+    /**
+     * Get priority class
+     * @param {string} priority - Priority value
+     * @returns {string} CSS class name
+     */
+    function getPriorityClass(priority) {
+        const priorityLower = String(priority).toLowerCase();
+
+        if (priorityLower.includes('high') || priorityLower.includes('urgent')) return 'priority-high';
+        if (priorityLower.includes('medium') || priorityLower.includes('normal')) return 'priority-medium';
+        if (priorityLower.includes('low')) return 'priority-low';
+
+        return '';
+    }
+
+    /**
+     * Format date string
+     * @param {string} dateStr - Date string
+     * @returns {string} Formatted date
+     */
+    function formatDate(dateStr) {
+        if (!dateStr) return '—';
+
+        try {
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return dateStr;
+
+            const now = new Date();
+            const diffMs = now - date;
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+            // Show relative time for recent dates
+            if (diffDays === 0) {
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                if (diffHours === 0) {
+                    const diffMins = Math.floor(diffMs / (1000 * 60));
+                    return `${diffMins} min${diffMins !== 1 ? 's' : ''} ago`;
+                }
+                return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+            } else if (diffDays === 1) {
+                return 'Yesterday';
+            } else if (diffDays < 7) {
+                return `${diffDays} days ago`;
+            }
+
+            // Format as date
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+            });
+        } catch (e) {
+            return dateStr;
+        }
+    }
+
+    /**
+     * Escape HTML to prevent XSS
+     * @param {string} text - Text to escape
+     * @returns {string} Escaped text
+     */
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    /**
+     * Show loading state
+     */
+    function showLoading() {
+        document.getElementById('loadingState').classList.remove('hidden');
+        document.getElementById('tableContainer').classList.add('hidden');
+        document.getElementById('emptyState').classList.add('hidden');
+        document.getElementById('errorMessage').classList.add('hidden');
+    }
+
+    /**
+     * Hide loading state
+     */
+    function hideLoading() {
+        document.getElementById('loadingState').classList.add('hidden');
+    }
+
+    /**
+     * Show empty state
+     */
+    function showEmptyState() {
+        document.getElementById('emptyState').classList.remove('hidden');
+        document.getElementById('tableContainer').classList.add('hidden');
+        document.getElementById('recordCount').textContent = '0 Records';
+    }
+
+    /**
+     * Show error message
+     * @param {string} message - Error message
+     */
+    function showError(message) {
+        const errorDiv = document.getElementById('errorMessage');
+        errorDiv.textContent = `⚠️ ${message}`;
+        errorDiv.classList.remove('hidden');
+    }
+
+    /**
+     * Refresh current view
+     */
+    function refreshData() {
+        loadData(currentTab);
+    }
+
+    // Auto-refresh every 5 minutes
+    setInterval(refreshData, 5 * 60 * 1000);
+</script>
