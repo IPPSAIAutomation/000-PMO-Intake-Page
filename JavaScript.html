@@ -11,6 +11,7 @@
     let currentData = null;
     let teamMembers = [];
     let userEmail = '';
+    let initTimeout = null;
 
     // Initialize on page load
     window.addEventListener('DOMContentLoaded', function () {
@@ -21,7 +22,14 @@
      * Initialize the dashboard
      */
     function initializeDashboard() {
-        // Set user email from server - get it from the server instead
+        // Set a timeout to catch stuck initialization
+        initTimeout = setTimeout(() => {
+            console.error('Initialization timeout - Google Apps Script may not be responding');
+            hideLoading();
+            showError('Unable to load data. This may be due to a slow connection or script timeout. Please refresh the page to try again.');
+        }, 30000); // 30 second timeout
+
+        // Set user email from server
         google.script.run
             .withSuccessHandler(function (email) {
                 userEmail = email;
@@ -43,10 +51,14 @@
             })
             .withFailureHandler(function (error) {
                 console.error('Error getting user email:', error);
+                clearTimeout(initTimeout);
+                hideLoading();
+                showError('Failed to load user information: ' + error.message + '. Please refresh the page.');
+
+                // Try to continue with fallback
                 userEmail = 'unknown@ucsd.edu';
                 document.getElementById('userEmail').textContent = 'Error loading email';
                 document.querySelector('.user-name').textContent = 'Unknown User';
-                // Still try to load data
                 loadTeamMembersAndData();
             })
             .getUserEmail();
@@ -66,7 +78,12 @@
             })
             .withFailureHandler(function (error) {
                 console.error('Error loading team members:', error);
+                clearTimeout(initTimeout);
+                hideLoading();
+                showError('Failed to load team members: ' + error.message + '. Some features may not work correctly.');
+
                 // Load data anyway with empty team list
+                teamMembers = [];
                 loadData(currentTab);
             })
             .getTeamMembers();
@@ -121,10 +138,9 @@
             tableHead.innerHTML = `
                 <th>Project Title</th>
                 <th>Executive Sponsor</th>
-                <th>AI Assessment</th>
+                <th>Status</th>
                 <th>Tech Effort</th>
                 <th>Score</th>
-                <th>Status</th>
             `;
         } else {
             // Ad Hoc table headers
@@ -183,6 +199,12 @@
      * @param {Object} data - Data object with headers and rows
      */
     function onDataLoaded(data) {
+        // Clear initialization timeout if it exists
+        if (initTimeout) {
+            clearTimeout(initTimeout);
+            initTimeout = null;
+        }
+
         currentData = data;
 
         // Hide loading state
@@ -203,9 +225,18 @@
      * @param {Error} error - Error object
      */
     function onDataError(error) {
-        hideLoading();
-        showError(error.message || 'Failed to load data. Please try again.');
+        // Clear initialization timeout if it exists
+        if (initTimeout) {
+            clearTimeout(initTimeout);
+            initTimeout = null;
+        }
+
         console.error('Error loading data:', error);
+        hideLoading();
+
+        // Show user-friendly error message
+        const errorMsg = error.message || 'Unknown error occurred';
+        showError(`Failed to load data: ${errorMsg}. Please try refreshing the page or contact support if the issue persists.`);
     }
 
     /**
@@ -356,12 +387,11 @@
      */
     function renderProjectTable(filteredData, headers, tableBody) {
         // Get column indices
-        const titleIndex = headers.indexOf('The Request');
+        const titleIndex = headers.indexOf('Project Title');
         const sponsorIndex = headers.indexOf('Executive Sponsor');
-        const aiScoredIndex = headers.indexOf('AI Scored');
+        const statusIndex = headers.indexOf('Status');
         const techEffortIndex = headers.indexOf('Tech Effort');
         const finalScoreIndex = headers.indexOf('Final Score');
-        const statusIndex = headers.indexOf('Status');
 
         // Create data rows
         filteredData.rows.forEach((row, rowIndex) => {
@@ -386,20 +416,11 @@
             tdSponsor.innerHTML = `<span style="color: var(--slate-600); font-size: 0.875rem;">${escapeHtml(sponsor)}</span>`;
             tr.appendChild(tdSponsor);
 
-            // AI Assessment Column
-            const tdAI = document.createElement('td');
-            const aiScored = row[aiScoredIndex] === 'TRUE' || row[aiScoredIndex] === true;
-
-            if (aiScored) {
-                tdAI.innerHTML = `
-                    <span style="display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe;">
-                        <span style="font-size: 0.75rem;">✨</span> Scored
-                    </span>
-                `;
-            } else {
-                tdAI.innerHTML = `<span style="color: var(--slate-400); font-size: 0.75rem; font-style: italic;">Pending AI</span>`;
-            }
-            tr.appendChild(tdAI);
+            // Status Column
+            const tdStatus = document.createElement('td');
+            const status = row[statusIndex] || 'Pending Review';
+            tdStatus.innerHTML = renderStatusBadge(status);
+            tr.appendChild(tdStatus);
 
             // Tech Effort Column (Visual bars)
             const tdEffort = document.createElement('td');
@@ -418,12 +439,6 @@
             const finalScore = parseFloat(row[finalScoreIndex]) || 0;
             tdScore.innerHTML = `<span style="font-family: monospace; font-weight: 700; color: var(--slate-700); font-size: 0.875rem;">${finalScore > 0 ? finalScore.toFixed(1) : '-'}</span>`;
             tr.appendChild(tdScore);
-
-            // Status Column
-            const tdStatus = document.createElement('td');
-            const status = row[statusIndex] || 'Pending Review';
-            tdStatus.innerHTML = renderStatusBadge(status);
-            tr.appendChild(tdStatus);
 
             tableBody.appendChild(tr);
         });
@@ -762,7 +777,7 @@
      */
     function renderProjectDetails(row, headers, panel, detailsBody, rowIndex) {
         // Get project-specific data
-        const titleIndex = headers.indexOf('The Request');
+        const titleIndex = headers.indexOf('Project Title');
         const statusIndex = headers.indexOf('Status');
         const sponsorIndex = headers.indexOf('Executive Sponsor');
         const problemIndex = headers.indexOf('Problem Statement');
@@ -1046,26 +1061,33 @@
         // Calculate new final score
         const finalScore = ((aiStrategyScore + aiImpactScore) / newEffort).toFixed(1);
 
-        // Update database
+        // Update local data immediately
+        const techEffortIndex = headers.indexOf('Tech Effort');
+        const finalScoreIndex = headers.indexOf('Final Score');
+        row[techEffortIndex] = newEffort;
+        row[finalScoreIndex] = finalScore;
+
+        // Update the final score display in the panel (without full re-render)
+        const finalScoreDisplay = document.getElementById('finalScoreDisplay');
+        if (finalScoreDisplay) {
+            finalScoreDisplay.textContent = finalScore;
+        }
+
+        // Update the score in the table row
+        const tableRow = document.querySelector(`tr[data-row-index="${rowIndex}"]`);
+        if (tableRow) {
+            const scoreCell = tableRow.querySelector('td:nth-child(5)'); // Score is 5th column
+            if (scoreCell) {
+                scoreCell.innerHTML = `<span style="font-family: monospace; font-weight: 700; color: var(--slate-700); font-size: 0.875rem;">${finalScore}</span>`;
+            }
+        }
+
+        // Update database in background
         const updates = {
             'Tech Effort': newEffort,
             'Final Score': finalScore
         };
-
-        updateMultipleFields(rowIndex, updates, function () {
-            // Update local data
-            const row = currentData.rows[rowIndex];
-            const headers = currentData.headers;
-
-            // Update local data
-            const techEffortIndex = headers.indexOf('Tech Effort');
-            const finalScoreIndex = headers.indexOf('Final Score');
-            row[techEffortIndex] = newEffort;
-            row[finalScoreIndex] = finalScore;
-
-            // Re-render panel
-            openDetails(row, headers);
-        });
+        updateMultipleFields(rowIndex, updates);
     }
 
     /**
@@ -1079,19 +1101,29 @@
      * Handle Project Decision (Approve/Reject)
      */
     function handleProjectDecision(rowIndex, decision) {
-        updateField(rowIndex, 'Status', decision, function () {
-            // Update local data
-            const row = currentData.rows[rowIndex];
-            const headers = currentData.headers;
-            const statusIndex = headers.indexOf('Status');
-            row[statusIndex] = decision;
+        // Update local data immediately (optimistic UI)
+        const row = currentData.rows[rowIndex];
+        const headers = currentData.headers;
+        const statusIndex = headers.indexOf('Status');
+        row[statusIndex] = decision;
 
-            // Re-render panel to show updated status
-            openDetails(row, headers);
+        // Update the status badge in the panel (without full re-render)
+        const statusElement = document.getElementById('detailStatus');
+        if (statusElement) {
+            statusElement.innerHTML = renderStatusBadge(decision);
+        }
 
-            // Optionally reload the table
-            setTimeout(() => loadData(currentTab), 500);
-        });
+        // Update the status in the table row (without full table re-render)
+        const tableRow = document.querySelector(`tr[data-row-index="${rowIndex}"]`);
+        if (tableRow) {
+            const statusCell = tableRow.querySelector('td:nth-child(3)'); // Status is 3rd column
+            if (statusCell) {
+                statusCell.innerHTML = renderStatusBadge(decision);
+            }
+        }
+
+        // Update database in background
+        updateField(rowIndex, 'Status', decision);
     }
 
     /**
