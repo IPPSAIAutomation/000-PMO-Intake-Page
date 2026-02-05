@@ -276,7 +276,7 @@
             // Assignee Column
             const tdAssignee = document.createElement('td');
             const assignee = row[assigneeIndex];
-            tdAssignee.innerHTML = renderAssigneeCell(assignee);
+            tdAssignee.innerHTML = renderAssigneeCell(assignee, rowIndex);
             tr.appendChild(tdAssignee);
 
             // Deadline Column
@@ -376,21 +376,25 @@
     /**
      * Render assignee cell
      * @param {string} assignee - Assignee email
+     * @param {number} rowIndex - Row index for updating
      * @returns {string} HTML
      */
-    function renderAssigneeCell(assignee) {
-        if (!assignee || assignee.trim() === '') {
-            return '<span class="unassigned">Unassigned</span>';
-        }
+    function renderAssigneeCell(assignee, rowIndex) {
+        const options = teamMembers.map(member => {
+            const selected = member === assignee ? 'selected' : '';
+            return `<option value="${escapeHtml(member)}" ${selected}>${escapeHtml(member)}</option>`;
+        }).join('');
 
-        const initial = assignee.charAt(0).toUpperCase();
-        const name = assignee.split('@')[0];
+        // Add "Unassigned" option at the beginning
+        const unassignedSelected = (!assignee || assignee.trim() === '') ? 'selected' : '';
+        const allOptions = `<option value="" ${unassignedSelected}>Unassigned</option>${options}`;
 
         return `
-            <div class="assignee-cell">
-                <div class="assignee-avatar">${initial}</div>
-                <span class="assignee-name">${escapeHtml(name)}</span>
-            </div>
+            <select class="assignee-select" 
+                    onchange="updateAssigneeFromTable(${rowIndex}, this.value)" 
+                    onclick="event.stopPropagation()">
+                ${allOptions}
+            </select>
         `;
     }
 
@@ -504,25 +508,45 @@
         // Update header
         document.getElementById('detailId').textContent = generateRequestId(0);
         document.getElementById('detailTitle').textContent = title;
-        document.getElementById('detailStatus').outerHTML = renderStatusBadge(status);
+        document.getElementById('detailStatus').innerHTML = renderStatusBadge(status);
+
+        // Store current row index for updates
+        panel.dataset.rowIndex = currentData.rows.indexOf(row);
 
         // Build details body
         const assigneeInitial = assignee ? assignee.charAt(0).toUpperCase() : '?';
         const assigneeName = assignee || 'Unassigned';
         const requestorName = requestor.split('@')[0];
 
+        // Build assignee dropdown options
+        const assigneeOptions = teamMembers.map(member => {
+            const selected = member === assignee ? 'selected' : '';
+            return `<option value="${escapeHtml(member)}" ${selected}>${escapeHtml(member)}</option>`;
+        }).join('');
+        const unassignedSelected = (!assignee || assignee.trim() === '') ? 'selected' : '';
+        const allAssigneeOptions = `<option value="" ${unassignedSelected}>Unassigned</option>${assigneeOptions}`;
+
         detailsBody.innerHTML = `
             <!-- Owner Section -->
             <div class="details-section">
                 <div class="section-header">
                     <span class="section-label">Owner</span>
-                    <button class="btn-change">Change</button>
+                    <button class="btn-change" onclick="toggleAssigneeDropdown()">Change</button>
                 </div>
-                <div class="owner-info">
+                <div class="owner-info" id="ownerDisplay">
                     <div class="owner-avatar">${assigneeInitial}</div>
                     <div>
                         <p class="owner-name">${escapeHtml(assigneeName)}</p>
                         <p class="owner-role">BI Analyst</p>
+                    </div>
+                </div>
+                <div id="ownerEdit" style="display: none;">
+                    <select class="assignee-select" id="detailAssigneeSelect" style="width: 100%; padding: 0.5rem; border-radius: 0.375rem; border: 1px solid var(--slate-300);">
+                        ${allAssigneeOptions}
+                    </select>
+                    <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
+                        <button class="btn-complete" onclick="saveAssigneeFromDetails()" style="flex: 1; padding: 0.375rem;">Save</button>
+                        <button class="btn-reject" onclick="cancelAssigneeEdit()" style="padding: 0.375rem 0.75rem;">Cancel</button>
                     </div>
                 </div>
             </div>
@@ -598,6 +622,44 @@
     function closeDetails() {
         const panel = document.getElementById('detailsPanel');
         panel.classList.remove('open');
+    }
+
+    /**
+     * Toggle assignee dropdown in details panel
+     */
+    function toggleAssigneeDropdown() {
+        const ownerDisplay = document.getElementById('ownerDisplay');
+        const ownerEdit = document.getElementById('ownerEdit');
+
+        ownerDisplay.style.display = 'none';
+        ownerEdit.style.display = 'block';
+    }
+
+    /**
+     * Save assignee from details panel
+     */
+    function saveAssigneeFromDetails() {
+        const panel = document.getElementById('detailsPanel');
+        const rowIndex = parseInt(panel.dataset.rowIndex);
+        const select = document.getElementById('detailAssigneeSelect');
+        const newValue = select.value;
+
+        updateField(rowIndex, 'Assignee', newValue, function () {
+            // Close the panel and reload data
+            closeDetails();
+            setTimeout(() => loadData(currentTab), 300);
+        });
+    }
+
+    /**
+     * Cancel assignee edit in details panel
+     */
+    function cancelAssigneeEdit() {
+        const ownerDisplay = document.getElementById('ownerDisplay');
+        const ownerEdit = document.getElementById('ownerEdit');
+
+        ownerDisplay.style.display = 'flex';
+        ownerEdit.style.display = 'none';
     }
 
     /**
@@ -717,6 +779,18 @@
      */
     function updateAssignee(rowIndex, newValue) {
         updateField(rowIndex, 'Assignee', newValue);
+    }
+
+    /**
+     * Update assignee from table dropdown
+     * @param {number} rowIndex - Row index
+     * @param {string} newValue - New assignee value
+     */
+    function updateAssigneeFromTable(rowIndex, newValue) {
+        updateField(rowIndex, 'Assignee', newValue, function () {
+            // Reload data to refresh the table
+            setTimeout(() => loadData(currentTab), 300);
+        });
     }
 
     /**

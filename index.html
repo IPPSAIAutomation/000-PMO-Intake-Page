@@ -977,6 +977,30 @@
             display: none !important;
         }
 
+        /* Assignee Select Dropdown */
+        .assignee-select {
+            width: 100%;
+            padding: 0.375rem 0.75rem;
+            border: 1px solid var(--slate-300);
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-family: var(--font-family);
+            background: white;
+            color: var(--slate-700);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .assignee-select:hover {
+            border-color: var(--blue-500);
+        }
+
+        .assignee-select:focus {
+            outline: none;
+            border-color: var(--blue-500);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
         /* ========================================
        RESPONSIVE
        ======================================== */
@@ -1128,7 +1152,7 @@
                     <div class="details-header-content">
                         <div class="details-id-status">
                             <span class="details-id" id="detailId">REQ-1024</span>
-                            <span class="status-badge status-new" id="detailStatus">New</span>
+                            <span id="detailStatus"></span>
                         </div>
                         <h2 class="details-title" id="detailTitle">Request Title</h2>
                     </div>
