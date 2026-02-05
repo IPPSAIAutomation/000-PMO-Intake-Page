@@ -92,7 +92,7 @@
         currentTab = tabName;
 
         // Update top bar title
-        const title = tabName === 'DB_ADHOCS' ? 'Ad Hoc Requests Queue' : 'Project Portfolio';
+        const title = tabName === 'DB_ADHOCS' ? 'Ad Hoc Requests Queue' : 'Project Intake & Prioritization';
         document.getElementById('topBarTitle').textContent = title;
 
         // Show/hide filters bar (only for Ad Hoc Requests)
@@ -103,8 +103,39 @@
             filtersBar.style.display = 'none';
         }
 
+        // Update table headers based on tab
+        updateTableHeaders(tabName);
+
         // Load data
         loadData(tabName);
+    }
+
+    /**
+     * Update table headers based on current tab
+     */
+    function updateTableHeaders(tabName) {
+        const tableHead = document.querySelector('thead tr');
+
+        if (tabName === 'DB_PROJECTS') {
+            // Project table headers
+            tableHead.innerHTML = `
+                <th>Project Title</th>
+                <th>Executive Sponsor</th>
+                <th>AI Assessment</th>
+                <th>Tech Effort</th>
+                <th>Score</th>
+                <th>Status</th>
+            `;
+        } else {
+            // Ad Hoc table headers
+            tableHead.innerHTML = `
+                <th>Request</th>
+                <th>Status</th>
+                <th>Assignee</th>
+                <th>Deadline</th>
+                <th style="width: 48px; text-align: right;">Action</th>
+            `;
+        }
     }
 
     /**
@@ -247,19 +278,35 @@
         // Clear existing content
         tableBody.innerHTML = '';
 
+        // Render based on current tab
+        if (currentTab === 'DB_PROJECTS') {
+            renderProjectTable(filteredData, data.headers, tableBody);
+        } else {
+            renderAdHocTable(filteredData, data.headers, tableBody);
+        }
+
+        // Show table
+        dataGridSection.style.display = 'block';
+        document.getElementById('emptyState').classList.add('hidden');
+    }
+
+    /**
+     * Render Ad Hoc Requests Table
+     */
+    function renderAdHocTable(filteredData, headers, tableBody) {
         // Get column indices
-        const titleIndex = data.headers.indexOf('The Request');
-        const statusIndex = data.headers.indexOf('Status');
-        const assigneeIndex = data.headers.indexOf('Assignee');
-        const deadlineIndex = data.headers.indexOf('Hard Deadline');
-        const idIndex = data.headers.indexOf('Timestamp'); // Use timestamp as ID for now
-        const requestorIndex = data.headers.indexOf('Email Address');
+        const titleIndex = headers.indexOf('The Request');
+        const statusIndex = headers.indexOf('Status');
+        const assigneeIndex = headers.indexOf('Assignee');
+        const deadlineIndex = headers.indexOf('Hard Deadline');
+        const idIndex = headers.indexOf('Timestamp');
+        const requestorIndex = headers.indexOf('Email Address');
 
         // Create data rows
         filteredData.rows.forEach((row, rowIndex) => {
             const tr = document.createElement('tr');
             tr.dataset.rowIndex = rowIndex;
-            tr.onclick = () => openDetails(row, data.headers);
+            tr.onclick = () => openDetails(row, headers);
 
             // Request Column (Title + Metadata)
             const tdRequest = document.createElement('td');
@@ -302,10 +349,84 @@
 
             tableBody.appendChild(tr);
         });
+    }
 
-        // Show table
-        dataGridSection.style.display = 'block';
-        document.getElementById('emptyState').classList.add('hidden');
+    /**
+     * Render Project Requests Table
+     */
+    function renderProjectTable(filteredData, headers, tableBody) {
+        // Get column indices
+        const titleIndex = headers.indexOf('The Request');
+        const sponsorIndex = headers.indexOf('Executive Sponsor');
+        const aiScoredIndex = headers.indexOf('AI Scored');
+        const techEffortIndex = headers.indexOf('Tech Effort');
+        const finalScoreIndex = headers.indexOf('Final Score');
+        const statusIndex = headers.indexOf('Status');
+
+        // Create data rows
+        filteredData.rows.forEach((row, rowIndex) => {
+            const tr = document.createElement('tr');
+            tr.dataset.rowIndex = rowIndex;
+            tr.onclick = () => openDetails(row, headers);
+
+            // Project Title Column
+            const tdTitle = document.createElement('td');
+            const title = row[titleIndex] || 'Untitled Project';
+            const projectId = `PROJ-${String(rowIndex + 1).padStart(3, '0')}`;
+
+            tdTitle.innerHTML = `
+                <div class="request-title">${escapeHtml(title)}</div>
+                <div class="request-meta">${projectId}</div>
+            `;
+            tr.appendChild(tdTitle);
+
+            // Executive Sponsor Column
+            const tdSponsor = document.createElement('td');
+            const sponsor = row[sponsorIndex] || 'Unknown';
+            tdSponsor.innerHTML = `<span style="color: var(--slate-600); font-size: 0.875rem;">${escapeHtml(sponsor)}</span>`;
+            tr.appendChild(tdSponsor);
+
+            // AI Assessment Column
+            const tdAI = document.createElement('td');
+            const aiScored = row[aiScoredIndex] === 'TRUE' || row[aiScoredIndex] === true;
+
+            if (aiScored) {
+                tdAI.innerHTML = `
+                    <span style="display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; background: #eef2ff; color: #4f46e5; border: 1px solid #c7d2fe;">
+                        <span style="font-size: 0.75rem;">✨</span> Scored
+                    </span>
+                `;
+            } else {
+                tdAI.innerHTML = `<span style="color: var(--slate-400); font-size: 0.75rem; font-style: italic;">Pending AI</span>`;
+            }
+            tr.appendChild(tdAI);
+
+            // Tech Effort Column (Visual bars)
+            const tdEffort = document.createElement('td');
+            const techEffort = parseInt(row[techEffortIndex]) || 0;
+
+            const bars = [1, 2, 3].map(level => {
+                const isActive = techEffort >= level;
+                return `<div style="width: 0.5rem; height: 1rem; border-radius: 0.125rem; background: ${isActive ? 'var(--slate-400)' : 'var(--slate-100)'}; display: inline-block;"></div>`;
+            }).join('');
+
+            tdEffort.innerHTML = `<div style="display: flex; gap: 0.25rem;">${bars}</div>`;
+            tr.appendChild(tdEffort);
+
+            // Score Column
+            const tdScore = document.createElement('td');
+            const finalScore = parseFloat(row[finalScoreIndex]) || 0;
+            tdScore.innerHTML = `<span style="font-family: monospace; font-weight: 700; color: var(--slate-700); font-size: 0.875rem;">${finalScore > 0 ? finalScore.toFixed(1) : '-'}</span>`;
+            tr.appendChild(tdScore);
+
+            // Status Column
+            const tdStatus = document.createElement('td');
+            const status = row[statusIndex] || 'Pending Review';
+            tdStatus.innerHTML = renderStatusBadge(status);
+            tr.appendChild(tdStatus);
+
+            tableBody.appendChild(tr);
+        });
     }
 
     /**
@@ -491,6 +612,28 @@
         const panel = document.getElementById('detailsPanel');
         const detailsBody = document.getElementById('detailsBody');
 
+        // Determine if this is a Project or Ad Hoc request
+        const isProject = currentTab === 'DB_PROJECTS';
+
+        // Store current row index for updates
+        const rowIndex = currentData.rows.indexOf(row);
+        panel.dataset.rowIndex = rowIndex;
+        panel.dataset.isProject = isProject;
+
+        if (isProject) {
+            renderProjectDetails(row, headers, panel, detailsBody, rowIndex);
+        } else {
+            renderAdHocDetails(row, headers, panel, detailsBody, rowIndex);
+        }
+
+        // Show panel
+        panel.classList.add('open');
+    }
+
+    /**
+     * Render Ad Hoc Request Details
+     */
+    function renderAdHocDetails(row, headers, panel, detailsBody, rowIndex) {
         // Get data
         const titleIndex = headers.indexOf('The Request');
         const statusIndex = headers.indexOf('Status');
@@ -510,11 +653,7 @@
         const requestor = row[requestorIndex] || 'Unknown';
         const deliverable = row[deliverableIndex] || '';
 
-        // Store current row index for updates
-        const rowIndex = currentData.rows.indexOf(row);
-        panel.dataset.rowIndex = rowIndex;
-
-        // Update header with correct request ID
+        // Update header
         document.getElementById('detailId').textContent = generateRequestId(rowIndex);
         document.getElementById('detailTitle').textContent = title;
         document.getElementById('detailStatus').innerHTML = renderStatusBadge(status);
@@ -616,9 +755,187 @@
                 </div>
             </div>
         `;
+    }
 
-        // Open panel
-        panel.classList.add('open');
+    /**
+     * Render Project Request Details (with AI Scoring & Prioritization)
+     */
+    function renderProjectDetails(row, headers, panel, detailsBody, rowIndex) {
+        // Get project-specific data
+        const titleIndex = headers.indexOf('The Request');
+        const statusIndex = headers.indexOf('Status');
+        const sponsorIndex = headers.indexOf('Executive Sponsor');
+        const problemIndex = headers.indexOf('Problem Statement');
+        const alignmentIndex = headers.indexOf('Strategic Alignment');
+        const impactIndex = headers.indexOf('Impact Quantification');
+
+        // AI Scoring fields
+        const aiScoredIndex = headers.indexOf('AI Scored');
+        const aiStrategyIndex = headers.indexOf('AI Strategy Score');
+        const aiImpactScoreIndex = headers.indexOf('AI Impact Score');
+        const aiJustificationIndex = headers.indexOf('AI Justification');
+
+        // PMO fields
+        const techEffortIndex = headers.indexOf('Tech Effort');
+        const techNotesIndex = headers.indexOf('Tech Notes');
+        const finalScoreIndex = headers.indexOf('Final Score');
+
+        const title = row[titleIndex] || 'Untitled Project';
+        const status = row[statusIndex] || 'Pending Review';
+        const sponsor = row[sponsorIndex] || 'Unknown';
+        const problem = row[problemIndex] || 'No problem statement provided';
+        const alignment = row[alignmentIndex] || 'Not specified';
+        const impact = row[impactIndex] || 'Not specified';
+
+        const aiScored = row[aiScoredIndex] === 'TRUE' || row[aiScoredIndex] === true;
+        const aiStrategyScore = parseInt(row[aiStrategyIndex]) || 0;
+        const aiImpactScore = parseInt(row[aiImpactScoreIndex]) || 0;
+        const aiJustification = row[aiJustificationIndex] || '';
+
+        const techEffort = parseInt(row[techEffortIndex]) || 1;
+        const techNotes = row[techNotesIndex] || '';
+        const finalScore = parseFloat(row[finalScoreIndex]) || 0;
+
+        // Update header
+        document.getElementById('detailId').textContent = `PROJ-${String(rowIndex + 1).padStart(3, '0')}`;
+        document.getElementById('detailTitle').textContent = title;
+        document.getElementById('detailStatus').innerHTML = renderStatusBadge(status);
+
+        // Render project-specific UI
+        detailsBody.innerHTML = `
+            <!-- Basic Info Grid -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;">
+                <div style="padding: 0.75rem; background: var(--slate-50); border-radius: 0.5rem; border: 1px solid var(--slate-200);">
+                    <div style="font-size: 0.75rem; color: var(--slate-400); text-transform: uppercase; font-weight: 600; margin-bottom: 0.25rem;">Executive Sponsor</div>
+                    <div style="font-weight: 500; color: var(--slate-900);">${escapeHtml(sponsor)}</div>
+                </div>
+                <div style="padding: 0.75rem; background: var(--slate-50); border-radius: 0.5rem; border: 1px solid var(--slate-200);">
+                    <div style="font-size: 0.75rem; color: var(--slate-400); text-transform: uppercase; font-weight: 600; margin-bottom: 0.25rem;">Impact</div>
+                    <div style="font-weight: 500; color: var(--slate-900); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(impact)}">View Quantification</div>
+                </div>
+            </div>
+
+            <!-- Problem Statement -->
+            <div style="margin-bottom: 2rem;">
+                <h3 style="font-weight: 600; color: var(--slate-900); margin-bottom: 0.5rem; font-size: 0.875rem;">Problem Statement</h3>
+                <p style="color: var(--slate-600); line-height: 1.6; font-size: 0.875rem;">${escapeHtml(problem)}</p>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid var(--slate-100); margin: 2rem 0;">
+
+            <!-- AI Scoring Section -->
+            <section id="aiScoringSection">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                    <h3 style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; color: #4c1d95; font-size: 1rem;">
+                        <span style="font-size: 1.25rem;">✨</span>
+                        AI Strategic Assessment
+                    </h3>
+                    ${!aiScored ? `
+                        <button 
+                            id="aiScoreBtn"
+                            onclick="handleAiScore(${rowIndex})"
+                            style="display: flex; align-items: center; gap: 0.5rem; background: #4f46e5; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; border: none; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background 0.2s;"
+                            onmouseover="this.style.background='#4338ca'"
+                            onmouseout="this.style.background='#4f46e5'"
+                        >
+                            <span>🤖</span>
+                            <span>Have AI Score This</span>
+                        </button>
+                    ` : ''}
+                </div>
+
+                ${aiScored ? `
+                    <div style="background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); border-radius: 0.75rem; border: 1px solid #c7d2fe; padding: 1.25rem;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                            <div style="background: white; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #c7d2fe; box-shadow: 0 1px 2px rgba(0,0,0,0.05); text-align: center;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: #4f46e5;">${aiStrategyScore}</div>
+                                <div style="font-size: 0.75rem; color: #818cf8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Strategy Score</div>
+                            </div>
+                            <div style="background: white; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #c7d2fe; box-shadow: 0 1px 2px rgba(0,0,0,0.05); text-align: center;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: #4f46e5;">${aiImpactScore}</div>
+                                <div style="font-size: 0.75rem; color: #818cf8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Impact Score</div>
+                            </div>
+                        </div>
+                        <div style="background: white; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #c7d2fe; font-size: 0.875rem; color: #4c1d95; font-style: italic;">
+                            "${escapeHtml(aiJustification)}"
+                        </div>
+                    </div>
+                ` : `
+                    <div style="border: 2px dashed var(--slate-200); border-radius: 0.75rem; padding: 2rem; text-align: center; color: var(--slate-400); font-size: 0.875rem;">
+                        Click the button above to generate AI scores and justification.
+                    </div>
+                `}
+            </section>
+
+            <!-- PMO Technical Review -->
+            <section style="margin-top: 2rem; ${!aiScored ? 'opacity: 0.5; pointer-events: none; filter: grayscale(1);' : ''}">
+                <h3 style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; color: var(--slate-800); margin-bottom: 1rem; font-size: 1rem;">
+                    <span style="font-size: 1.25rem;">⚙️</span>
+                    PMO Technical Review
+                </h3>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--slate-500); text-transform: uppercase; margin-bottom: 0.5rem;">Technical Effort Level (1-3)</label>
+                    <div style="display: flex; gap: 1rem;">
+                        ${[1, 2, 3].map(val => `
+                            <button
+                                onclick="handleTechEffortChange(${rowIndex}, ${val})"
+                                style="flex: 1; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid ${techEffort === val ? 'var(--slate-800)' : 'var(--slate-200)'}; background: ${techEffort === val ? 'var(--slate-800)' : 'white'}; color: ${techEffort === val ? 'white' : 'var(--slate-600)'}; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: all 0.2s;"
+                            >
+                                Level ${val}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--slate-500); text-transform: uppercase; margin-bottom: 0.5rem;">Technical Constraints / Notes</label>
+                    <textarea 
+                        id="techNotesInput"
+                        onblur="handleTechNotesChange(${rowIndex}, this.value)"
+                        style="width: 100%; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--slate-200); font-size: 0.875rem; font-family: inherit; resize: vertical;"
+                        rows="2"
+                        placeholder="Enter technical justification..."
+                    >${escapeHtml(techNotes)}</textarea>
+                </div>
+            </section>
+
+            <!-- Final Scoring & Decision -->
+            <section style="padding-top: 1.5rem; border-top: 1px solid var(--slate-100); margin-top: 2rem; ${!aiScored ? 'opacity: 0.5; pointer-events: none;' : ''}">
+                <div style="background: var(--slate-900); border-radius: 0.75rem; padding: 1.25rem; color: white; margin-bottom: 1.5rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 1.25rem;">🧮</span>
+                            <span style="font-weight: 700;">Final Prioritization</span>
+                        </div>
+                        <div id="finalScoreDisplay" style="font-size: 2rem; font-weight: 700; color: #60a5fa;">${finalScore > 0 ? finalScore.toFixed(1) : '--'}</div>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--slate-400); text-align: right; font-family: monospace;">
+                        (Strategy + Impact) / Tech Effort
+                    </div>
+                </div>
+
+                <div>
+                    <h3 style="font-size: 0.875rem; font-weight: 700; color: var(--slate-800); margin-bottom: 0.75rem;">Committee Decision</h3>
+                    <div style="display: flex; gap: 0.75rem;">
+                        <button 
+                            onclick="handleProjectDecision(${rowIndex}, 'Approved')"
+                            style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid ${status === 'Approved' ? '#059669' : 'var(--slate-200)'}; background: ${status === 'Approved' ? '#059669' : 'white'}; color: ${status === 'Approved' ? 'white' : '#059669'}; font-weight: 500; cursor: pointer; transition: all 0.2s;"
+                            onmouseover="if('${status}' !== 'Approved') this.style.background='#ecfdf5'"
+                            onmouseout="if('${status}' !== 'Approved') this.style.background='white'"
+                        >
+                            <span>👍</span> Approve
+                        </button>
+                        <button 
+                            onclick="handleProjectDecision(${rowIndex}, 'Rejected')"
+                            style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid ${status === 'Rejected' ? '#dc2626' : 'var(--slate-200)'}; background: ${status === 'Rejected' ? '#dc2626' : 'white'}; color: ${status === 'Rejected' ? 'white' : '#dc2626'}; font-weight: 500; cursor: pointer; transition: all 0.2s;"
+                            onmouseover="if('${status}' !== 'Rejected') this.style.background='#fef2f2'"
+                            onmouseout="if('${status}' !== 'Rejected') this.style.background='white'"
+                        >
+                            <span>👎</span> Reject
+                        </button>
+                    </div>
+                </div>
+            </section>
+        `;
     }
 
     /**
@@ -666,6 +983,145 @@
         ownerDisplay.style.display = 'flex';
         ownerEdit.style.display = 'none';
     }
+
+    /**
+     * ========================================
+     * PROJECT WORKFLOW HANDLERS
+     * ========================================
+     */
+
+    /**
+     * Handle AI Scoring (Simulates AI API call)
+     */
+    function handleAiScore(rowIndex) {
+        const btn = document.getElementById('aiScoreBtn');
+        if (!btn) return;
+
+        // Show loading state
+        btn.disabled = true;
+        btn.innerHTML = '<span style="display: inline-block; animation: spin 1s linear infinite;">⏳</span> <span>Analyzing...</span>';
+
+        // Add spin animation
+        const style = document.createElement('style');
+        style.textContent = '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
+        document.head.appendChild(style);
+
+        // Simulate AI API call (1.5 seconds)
+        setTimeout(() => {
+            // Mock AI scores
+            const mockStrategyScore = 10;
+            const mockImpactScore = 10;
+            const mockJustification = 'This project aligns well with integrated functions and service excellence, showing potential for significant impact on client experience and resource deployment. High strategic value confirmed.';
+
+            // Update the row data
+            const updates = {
+                'AI Scored': 'TRUE',
+                'AI Strategy Score': mockStrategyScore,
+                'AI Impact Score': mockImpactScore,
+                'AI Justification': mockJustification
+            };
+
+            updateMultipleFields(rowIndex, updates, function () {
+                // Reload the panel to show new data
+                const row = currentData.rows[rowIndex];
+                const headers = currentData.headers;
+                openDetails(row, headers);
+            });
+        }, 1500);
+    }
+
+    /**
+     * Handle Tech Effort Change
+     */
+    function handleTechEffortChange(rowIndex, newEffort) {
+        const row = currentData.rows[rowIndex];
+        const headers = currentData.headers;
+
+        // Get AI scores
+        const aiStrategyIndex = headers.indexOf('AI Strategy Score');
+        const aiImpactScoreIndex = headers.indexOf('AI Impact Score');
+        const aiStrategyScore = parseInt(row[aiStrategyIndex]) || 0;
+        const aiImpactScore = parseInt(row[aiImpactScoreIndex]) || 0;
+
+        // Calculate new final score
+        const finalScore = ((aiStrategyScore + aiImpactScore) / newEffort).toFixed(1);
+
+        // Update database
+        const updates = {
+            'Tech Effort': newEffort,
+            'Final Score': finalScore
+        };
+
+        updateMultipleFields(rowIndex, updates, function () {
+            // Update local data
+            const row = currentData.rows[rowIndex];
+            const headers = currentData.headers;
+
+            // Update local data
+            const techEffortIndex = headers.indexOf('Tech Effort');
+            const finalScoreIndex = headers.indexOf('Final Score');
+            row[techEffortIndex] = newEffort;
+            row[finalScoreIndex] = finalScore;
+
+            // Re-render panel
+            openDetails(row, headers);
+        });
+    }
+
+    /**
+     * Handle Tech Notes Change
+     */
+    function handleTechNotesChange(rowIndex, newNotes) {
+        updateField(rowIndex, 'Tech Notes', newNotes);
+    }
+
+    /**
+     * Handle Project Decision (Approve/Reject)
+     */
+    function handleProjectDecision(rowIndex, decision) {
+        updateField(rowIndex, 'Status', decision, function () {
+            // Update local data
+            const row = currentData.rows[rowIndex];
+            const headers = currentData.headers;
+            const statusIndex = headers.indexOf('Status');
+            row[statusIndex] = decision;
+
+            // Re-render panel to show updated status
+            openDetails(row, headers);
+
+            // Optionally reload the table
+            setTimeout(() => loadData(currentTab), 500);
+        });
+    }
+
+    /**
+     * Update multiple fields at once
+     */
+    function updateMultipleFields(rowIndex, updates, callback) {
+        const sheetRowIndex = rowIndex + 1; // +1 for header row
+
+        google.script.run
+            .withSuccessHandler(function (result) {
+                console.log('Multiple fields updated successfully');
+
+                // Update local data
+                const headers = currentData.headers;
+                Object.keys(updates).forEach(fieldName => {
+                    const fieldIndex = headers.indexOf(fieldName);
+                    if (fieldIndex !== -1) {
+                        currentData.rows[rowIndex][fieldIndex] = updates[fieldName];
+                    }
+                });
+
+                if (callback) callback(result);
+            })
+            .withFailureHandler(function (error) {
+                console.error('Error updating fields:', error);
+                alert('Failed to update fields. Please try again.');
+            })
+            .updateRow(currentTab, sheetRowIndex, updates);
+    }
+
 
     /**
      * Render assignee dropdown
