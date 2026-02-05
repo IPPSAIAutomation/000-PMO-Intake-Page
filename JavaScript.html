@@ -69,31 +69,23 @@
      * @param {string} tabName - Name of the tab to switch to
      */
     function switchTab(tabName) {
-        // Update active state
-        document.querySelectorAll('.tab-button').forEach(btn => {
+        // Update active state on sidebar nav buttons
+        document.querySelectorAll('.nav-button').forEach(btn => {
             btn.classList.remove('active');
         });
 
         const activeButton = tabName === 'DB_ADHOCS' ?
-            document.getElementById('tab-adhocs') :
-            document.getElementById('tab-projects');
+            document.getElementById('nav-adhoc') :
+            document.getElementById('nav-projects');
 
         activeButton.classList.add('active');
 
         // Update current tab
         currentTab = tabName;
 
-        // Show/hide view switcher (only for Ad Hoc Requests)
-        const viewSwitcher = document.getElementById('viewSwitcher');
-        if (tabName === 'DB_ADHOCS') {
-            viewSwitcher.style.display = 'flex';
-        } else {
-            viewSwitcher.style.display = 'none';
-        }
-
-        // Update content title
-        const title = tabName === 'DB_ADHOCS' ? 'Ad Hoc Requests' : 'Project Requests';
-        document.getElementById('contentTitle').textContent = title;
+        // Update top bar title
+        const title = tabName === 'DB_ADHOCS' ? 'Ad Hoc Requests Queue' : 'Project Portfolio';
+        document.getElementById('topBarTitle').textContent = title;
 
         // Load data
         loadData(tabName);
@@ -104,14 +96,14 @@
      * @param {string} viewName - Name of the view
      */
     function switchView(viewName) {
-        // Update active state
-        document.querySelectorAll('.view-button').forEach(btn => {
+        // Update active state on filter buttons
+        document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.classList.remove('active');
         });
 
         const activeButton = viewName === 'myTasks' ?
-            document.getElementById('view-myTasks') :
-            document.getElementById('view-allRequests');
+            document.getElementById('filter-my') :
+            document.getElementById('filter-all');
 
         activeButton.classList.add('active');
 
@@ -221,16 +213,14 @@
      * @param {Object} data - Data object with headers and rows
      */
     function renderTable(data) {
-        const tableHead = document.getElementById('tableHead');
         const tableBody = document.getElementById('tableBody');
-        const tableContainer = document.getElementById('tableContainer');
+        const dataGridSection = document.getElementById('dataGridSection');
 
         // Filter data based on current view
         const filteredData = filterData(data);
 
-        // Update record count
-        document.getElementById('recordCount').textContent =
-            `${filteredData.rows.length} Record${filteredData.rows.length !== 1 ? 's' : ''}`;
+        // Calculate stats
+        calculateStats(filteredData);
 
         // Check if filtered data is empty
         if (filteredData.rows.length === 0) {
@@ -239,136 +229,375 @@
         }
 
         // Clear existing content
-        tableHead.innerHTML = '';
         tableBody.innerHTML = '';
 
-        // Reorder headers for Ad Hoc Requests to prioritize task management columns
-        let orderedHeaders = [...data.headers];
-        let headerIndexMap = {};
-
-        if (currentTab === 'DB_ADHOCS') {
-            // Define columns to hide (administrative/audit columns)
-            const hiddenColumns = ['Last Modified', 'Modified By'];
-
-            // Define priority order (actionable columns first)
-            const priorityColumns = ['Assignee', 'Status', 'Deliverable Evidence', 'Hard Deadline', 'The Request'];
-
-            // Define columns to move to the end
-            const deprioritizedColumns = ['Timestamp', 'Email Address'];
-
-            const reorderedHeaders = [];
-            const usedIndices = new Set();
-
-            // Step 1: Add priority columns first
-            priorityColumns.forEach(col => {
-                const index = data.headers.indexOf(col);
-                if (index !== -1) {
-                    reorderedHeaders.push(col);
-                    headerIndexMap[col] = index;
-                    usedIndices.add(index);
-                }
-            });
-
-            // Step 2: Add remaining columns (excluding hidden and deprioritized)
-            data.headers.forEach((header, index) => {
-                if (!usedIndices.has(index) &&
-                    !hiddenColumns.includes(header) &&
-                    !deprioritizedColumns.includes(header)) {
-                    reorderedHeaders.push(header);
-                    headerIndexMap[header] = index;
-                    usedIndices.add(index);
-                }
-            });
-
-            // Step 3: Add deprioritized columns at the end
-            deprioritizedColumns.forEach(col => {
-                const index = data.headers.indexOf(col);
-                if (index !== -1 && !usedIndices.has(index)) {
-                    reorderedHeaders.push(col);
-                    headerIndexMap[col] = index;
-                    usedIndices.add(index);
-                }
-            });
-
-            // Note: hiddenColumns are intentionally not added to reorderedHeaders
-            console.log('Column order:', reorderedHeaders);
-            console.log('Hidden columns:', hiddenColumns);
-
-            orderedHeaders = reorderedHeaders;
-        } else {
-            // For other tabs, keep original order
-            data.headers.forEach((header, index) => {
-                headerIndexMap[header] = index;
-            });
-        }
-
-        // Create header row
-        const headerRow = document.createElement('tr');
-        orderedHeaders.forEach(header => {
-            const th = document.createElement('th');
-            th.textContent = header;
-
-            // Add column-specific classes
-            if (header === 'Assignee') th.classList.add('col-assignee');
-            if (header === 'Status') th.classList.add('col-status');
-            if (header === 'Deliverable Evidence') th.classList.add('col-deliverable');
-            if (header === 'Hard Deadline') th.classList.add('col-deadline');
-            if (header === 'The Request') th.classList.add('col-request');
-
-            headerRow.appendChild(th);
-        });
-        tableHead.appendChild(headerRow);
+        // Get column indices
+        const priorityIndex = data.headers.indexOf('Priority');
+        const titleIndex = data.headers.indexOf('The Request');
+        const statusIndex = data.headers.indexOf('Status');
+        const assigneeIndex = data.headers.indexOf('Assignee');
+        const deadlineIndex = data.headers.indexOf('Hard Deadline');
+        const idIndex = data.headers.indexOf('Timestamp'); // Use timestamp as ID for now
+        const requestorIndex = data.headers.indexOf('Email Address');
 
         // Create data rows
         filteredData.rows.forEach((row, rowIndex) => {
             const tr = document.createElement('tr');
             tr.dataset.rowIndex = rowIndex;
+            tr.onclick = () => openDetails(row, data.headers);
 
-            orderedHeaders.forEach(header => {
-                const cellIndex = headerIndexMap[header];
-                const cell = row[cellIndex];
-                const td = document.createElement('td');
+            // Priority Column
+            const tdPriority = document.createElement('td');
+            const priority = row[priorityIndex] || 'Low';
+            tdPriority.innerHTML = renderPriorityIcon(priority);
+            tr.appendChild(tdPriority);
 
-                // Add column-specific classes
-                if (header === 'Assignee') td.classList.add('col-assignee');
-                if (header === 'Status') td.classList.add('col-status');
-                if (header === 'Deliverable Evidence') td.classList.add('col-deliverable');
-                if (header === 'Hard Deadline') td.classList.add('col-deadline');
-                if (header === 'The Request') td.classList.add('col-request');
+            // Request Column (Title + Metadata)
+            const tdRequest = document.createElement('td');
+            const title = row[titleIndex] || 'Untitled Request';
+            const requestor = row[requestorIndex] || 'Unknown';
+            const timestamp = formatTimestamp(row[idIndex]);
+            const requestId = generateRequestId(rowIndex);
 
-                // Render interactive or formatted cell
-                if (currentTab === 'DB_ADHOCS') {
-                    if (header === 'Assignee') {
-                        td.innerHTML = renderAssigneeDropdown(cell, rowIndex);
-                    } else if (header === 'Status') {
-                        td.innerHTML = renderStatusDropdown(cell, rowIndex, row[headerIndexMap['Deliverable Evidence']]);
-                    } else if (header === 'Deliverable Evidence') {
-                        td.innerHTML = renderDeliverableInput(cell, rowIndex);
-                    } else if (header === 'Hard Deadline') {
-                        td.innerHTML = formatDeadline(cell);
-                    } else {
-                        td.innerHTML = formatCell(cell, header);
-                    }
-                } else {
-                    td.innerHTML = formatCell(cell, header);
-                }
+            tdRequest.innerHTML = `
+                <div class="request-title">${escapeHtml(title)}</div>
+                <div class="request-meta">
+                    ${requestId} • ${escapeHtml(requestor.split('@')[0])} • <span>${timestamp}</span>
+                </div>
+            `;
+            tr.appendChild(tdRequest);
 
-                // Add truncate class for long text
-                if (typeof cell === 'string' && cell.length > 50 &&
-                    header !== 'Assignee' && header !== 'Status' && header !== 'Deliverable Evidence') {
-                    td.classList.add('text-truncate');
-                    td.title = cell; // Show full text on hover
-                }
+            // Status Column
+            const tdStatus = document.createElement('td');
+            const status = row[statusIndex] || 'New';
+            tdStatus.innerHTML = renderStatusBadge(status);
+            tr.appendChild(tdStatus);
 
-                tr.appendChild(td);
-            });
+            // Assignee Column
+            const tdAssignee = document.createElement('td');
+            const assignee = row[assigneeIndex];
+            tdAssignee.innerHTML = renderAssigneeCell(assignee);
+            tr.appendChild(tdAssignee);
+
+            // Deadline Column
+            const tdDeadline = document.createElement('td');
+            const deadline = row[deadlineIndex];
+            tdDeadline.innerHTML = renderDeadlineCell(deadline);
+            tr.appendChild(tdDeadline);
+
+            // Action Column (Chevron)
+            const tdAction = document.createElement('td');
+            tdAction.style.textAlign = 'right';
+            tdAction.innerHTML = '<span class="chevron-icon">›</span>';
+            tr.appendChild(tdAction);
 
             tableBody.appendChild(tr);
         });
 
         // Show table
-        tableContainer.classList.remove('hidden');
+        dataGridSection.style.display = 'block';
         document.getElementById('emptyState').classList.add('hidden');
+    }
+
+    /**
+     * Calculate and update stats
+     * @param {Object} data - Filtered data
+     */
+    function calculateStats(data) {
+        const total = data.rows.length;
+
+        // Calculate urgent (due < 48 hours)
+        const deadlineIndex = currentData.headers.indexOf('Hard Deadline');
+        const now = new Date();
+        let urgent = 0;
+
+        data.rows.forEach(row => {
+            const deadlineStr = row[deadlineIndex];
+            if (deadlineStr) {
+                try {
+                    const deadline = new Date(deadlineStr);
+                    const diffHours = (deadline - now) / (1000 * 60 * 60);
+                    if (diffHours > 0 && diffHours <= 48) {
+                        urgent++;
+                    }
+                } catch (e) {
+                    // Ignore invalid dates
+                }
+            }
+        });
+
+        // Calculate new count for badge
+        const statusIndex = currentData.headers.indexOf('Status');
+        const newCount = currentData.rows.filter(row => row[statusIndex] === 'New').length;
+
+        // Update UI
+        document.getElementById('stat-total').textContent = total;
+        document.getElementById('stat-urgent').textContent = urgent;
+        document.getElementById('badge-new').textContent = newCount;
+    }
+
+    /**
+     * Render priority icon
+     * @param {string} priority - Priority value
+     * @returns {string} HTML
+     */
+    function renderPriorityIcon(priority) {
+        const priorityLower = String(priority).toLowerCase();
+
+        if (priorityLower.includes('high')) {
+            return '<div class="priority-icon priority-high">⚠</div>';
+        } else if (priorityLower.includes('medium')) {
+            return '<div class="priority-icon"><div class="priority-medium"></div></div>';
+        } else {
+            return '<div class="priority-icon"><div class="priority-low"></div></div>';
+        }
+    }
+
+    /**
+     * Render status badge
+     * @param {string} status - Status value
+     * @returns {string} HTML
+     */
+    function renderStatusBadge(status) {
+        const statusLower = String(status).toLowerCase();
+        let className = 'status-new';
+
+        if (statusLower.includes('progress')) {
+            className = 'status-in-progress';
+        } else if (statusLower.includes('complete')) {
+            className = 'status-completed';
+        } else if (statusLower.includes('review')) {
+            className = 'status-review';
+        }
+
+        return `<span class="status-badge ${className}">${escapeHtml(status)}</span>`;
+    }
+
+    /**
+     * Render assignee cell
+     * @param {string} assignee - Assignee email
+     * @returns {string} HTML
+     */
+    function renderAssigneeCell(assignee) {
+        if (!assignee || assignee.trim() === '') {
+            return '<span class="unassigned">Unassigned</span>';
+        }
+
+        const initial = assignee.charAt(0).toUpperCase();
+        const name = assignee.split('@')[0];
+
+        return `
+            <div class="assignee-cell">
+                <div class="assignee-avatar">${initial}</div>
+                <span class="assignee-name">${escapeHtml(name)}</span>
+            </div>
+        `;
+    }
+
+    /**
+     * Render deadline cell
+     * @param {string} dateStr - Date string
+     * @returns {string} HTML
+     */
+    function renderDeadlineCell(dateStr) {
+        if (!dateStr) {
+            return '<span style="color: var(--slate-300);">—</span>';
+        }
+
+        try {
+            const deadline = new Date(dateStr);
+            if (isNaN(deadline.getTime())) return escapeHtml(dateStr);
+
+            const now = new Date();
+            const diffHours = (deadline - now) / (1000 * 60 * 60);
+
+            let className = 'deadline-normal';
+            if (diffHours < 0 || diffHours <= 48) {
+                className = 'deadline-warning';
+            }
+
+            const formattedDate = deadline.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric'
+            });
+
+            return `
+                <div class="deadline-cell ${className}">
+                    <span class="deadline-icon">📅</span>
+                    ${formattedDate}
+                </div>
+            `;
+        } catch (e) {
+            return escapeHtml(dateStr);
+        }
+    }
+
+    /**
+     * Generate request ID
+     * @param {number} index - Row index
+     * @returns {string} Request ID
+     */
+    function generateRequestId(index) {
+        return `REQ-${1000 + index}`;
+    }
+
+    /**
+     * Format timestamp for display
+     * @param {string} timestamp - Timestamp string
+     * @returns {string} Formatted timestamp
+     */
+    function formatTimestamp(timestamp) {
+        if (!timestamp) return 'recently';
+
+        try {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / (1000 * 60));
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+            if (diffMins < 60) {
+                return `${diffMins} mins ago`;
+            } else if (diffHours < 24) {
+                return `${diffHours} hours ago`;
+            } else if (diffDays === 1) {
+                return '1 day ago';
+            } else if (diffDays < 7) {
+                return `${diffDays} days ago`;
+            } else {
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }
+        } catch (e) {
+            return 'recently';
+        }
+    }
+
+    /**
+     * Open details panel
+     * @param {Array} row - Row data
+     * @param {Array} headers - Column headers
+     */
+    function openDetails(row, headers) {
+        const panel = document.getElementById('detailsPanel');
+        const detailsBody = document.getElementById('detailsBody');
+
+        // Get data
+        const titleIndex = headers.indexOf('The Request');
+        const statusIndex = headers.indexOf('Status');
+        const assigneeIndex = headers.indexOf('Assignee');
+        const justificationIndex = headers.indexOf('Business Justification');
+        const filtersIndex = headers.indexOf('Filters Needed');
+        const outputIndex = headers.indexOf('Output Format');
+        const requestorIndex = headers.indexOf('Email Address');
+        const deliverableIndex = headers.indexOf('Deliverable Evidence');
+
+        const title = row[titleIndex] || 'Untitled Request';
+        const status = row[statusIndex] || 'New';
+        const assignee = row[assigneeIndex] || '';
+        const justification = row[justificationIndex] || 'No justification provided';
+        const filters = row[filtersIndex] || 'No filters specified';
+        const output = row[outputIndex] || 'Not specified';
+        const requestor = row[requestorIndex] || 'Unknown';
+        const deliverable = row[deliverableIndex] || '';
+
+        // Update header
+        document.getElementById('detailId').textContent = generateRequestId(0);
+        document.getElementById('detailTitle').textContent = title;
+        document.getElementById('detailStatus').outerHTML = renderStatusBadge(status);
+
+        // Build details body
+        const assigneeInitial = assignee ? assignee.charAt(0).toUpperCase() : '?';
+        const assigneeName = assignee || 'Unassigned';
+        const requestorName = requestor.split('@')[0];
+
+        detailsBody.innerHTML = `
+            <!-- Owner Section -->
+            <div class="details-section">
+                <div class="section-header">
+                    <span class="section-label">Owner</span>
+                    <button class="btn-change">Change</button>
+                </div>
+                <div class="owner-info">
+                    <div class="owner-avatar">${assigneeInitial}</div>
+                    <div>
+                        <p class="owner-name">${escapeHtml(assigneeName)}</p>
+                        <p class="owner-role">BI Analyst</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Request Details -->
+            <div style="margin-bottom: 2rem;">
+                <div style="margin-bottom: 1rem;">
+                    <h3 class="field-label">
+                        <span class="field-icon blue">📄</span>
+                        Business Justification
+                    </h3>
+                    <div class="field-content">${escapeHtml(justification)}</div>
+                </div>
+
+                <div class="field-grid" style="margin-bottom: 1rem;">
+                    <div>
+                        <h3 class="field-label">
+                            <span class="field-icon purple">🔽</span>
+                            Filters Needed
+                        </h3>
+                        <div class="field-content">${escapeHtml(filters)}</div>
+                    </div>
+                    <div>
+                        <h3 class="field-label">
+                            <span class="field-icon emerald">📊</span>
+                            Output Format
+                        </h3>
+                        <div class="field-content">${escapeHtml(output)}</div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="field-label">
+                        <span class="field-icon slate">👤</span>
+                        Requestor Contact
+                    </h3>
+                    <div class="contact-card">
+                        <div class="contact-info">
+                            <div class="contact-icon">✉</div>
+                            <div>
+                                <p class="contact-name">${escapeHtml(requestorName)}</p>
+                                <p class="contact-email">${escapeHtml(requestor)}</p>
+                            </div>
+                        </div>
+                        <button class="btn-email" onclick="window.location.href='mailto:${escapeHtml(requestor)}'">Send Email</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Area -->
+            <div class="action-section">
+                <h3>Deliverable Evidence</h3>
+                <input 
+                    type="text" 
+                    class="action-input" 
+                    placeholder="Paste link to dashboard/file..."
+                    value="${escapeHtml(deliverable)}"
+                >
+                <div class="action-buttons">
+                    <button class="btn-complete">Mark Complete</button>
+                    <button class="btn-reject">Reject</button>
+                </div>
+            </div>
+        `;
+
+        // Open panel
+        panel.classList.add('open');
+    }
+
+    /**
+     * Close details panel
+     */
+    function closeDetails() {
+        const panel = document.getElementById('detailsPanel');
+        panel.classList.remove('open');
     }
 
     /**
@@ -711,7 +940,7 @@
      */
     function showLoading() {
         document.getElementById('loadingState').classList.remove('hidden');
-        document.getElementById('tableContainer').classList.add('hidden');
+        document.getElementById('dataGridSection').style.display = 'none';
         document.getElementById('emptyState').classList.add('hidden');
         document.getElementById('errorMessage').classList.add('hidden');
     }
@@ -728,8 +957,9 @@
      */
     function showEmptyState() {
         document.getElementById('emptyState').classList.remove('hidden');
-        document.getElementById('tableContainer').classList.add('hidden');
-        document.getElementById('recordCount').textContent = '0 Records';
+        document.getElementById('dataGridSection').style.display = 'none';
+        document.getElementById('stat-total').textContent = '0';
+        document.getElementById('stat-urgent').textContent = '0';
     }
 
     /**
