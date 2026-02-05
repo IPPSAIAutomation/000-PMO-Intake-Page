@@ -513,6 +513,12 @@
             className = 'status-completed';
         } else if (statusLower.includes('review')) {
             className = 'status-review';
+        } else if (statusLower.includes('cancel')) {
+            className = 'status-cancelled';
+        } else if (statusLower.includes('reject')) {
+            className = 'status-rejected';
+        } else if (statusLower.includes('approv')) {
+            className = 'status-approved';
         }
 
         return `<span class="status-badge ${className}">${escapeHtml(status)}</span>`;
@@ -671,7 +677,38 @@
         // Update header
         document.getElementById('detailId').textContent = generateRequestId(rowIndex);
         document.getElementById('detailTitle').textContent = title;
-        document.getElementById('detailStatus').innerHTML = renderStatusBadge(status);
+
+        // Render clickable status badge with dropdown
+        const statusContainer = document.getElementById('detailStatus');
+        statusContainer.innerHTML = `
+            <div style="position: relative; display: inline-block;">
+                <button 
+                    onclick="toggleStatusDropdown(event)" 
+                    style="background: none; border: none; padding: 0; cursor: pointer;"
+                    aria-label="Change status"
+                >
+                    ${renderStatusBadge(status)}
+                </button>
+                <div id="statusDropdown" class="status-dropdown" style="display: none;">
+                    <div class="status-dropdown-header">CHANGE STATUS</div>
+                    <button class="status-dropdown-item" onclick="changeAdHocStatus(${rowIndex}, 'New')" data-status="New">
+                        <span class="status-dot" style="background: #3b82f6;"></span>
+                        New
+                        ${status === 'New' ? '<span style="margin-left: auto; color: #10b981;">✓</span>' : ''}
+                    </button>
+                    <button class="status-dropdown-item" onclick="changeAdHocStatus(${rowIndex}, 'In Progress')" data-status="In Progress">
+                        <span class="status-dot" style="background: #f59e0b;"></span>
+                        In Progress
+                        ${status === 'In Progress' ? '<span style="margin-left: auto; color: #10b981;">✓</span>' : ''}
+                    </button>
+                    <button class="status-dropdown-item" onclick="changeAdHocStatus(${rowIndex}, 'Cancelled')" data-status="Cancelled">
+                        <span class="status-dot" style="background: #ef4444;"></span>
+                        Cancelled
+                        ${status === 'Cancelled' ? '<span style="margin-left: auto; color: #10b981;">✓</span>' : ''}
+                    </button>
+                </div>
+            </div>
+        `;
 
         // Build details body
         const assigneeInitial = assignee ? assignee.charAt(0).toUpperCase() : '?';
@@ -761,12 +798,14 @@
                 <h3>Deliverable Evidence</h3>
                 <input 
                     type="text" 
+                    id="deliverableInput"
                     class="action-input" 
                     placeholder="Paste link to dashboard/file..."
                     value="${escapeHtml(deliverable)}"
+                    onblur="saveDeliverableEvidence(${rowIndex}, this.value)"
                 >
                 <div class="action-buttons">
-                    <button class="btn-complete">Mark Complete</button>
+                    <button class="btn-complete" onclick="markAdHocComplete(${rowIndex})">Mark Complete</button>
                 </div>
             </div>
         `;
@@ -998,6 +1037,194 @@
         ownerDisplay.style.display = 'flex';
         ownerEdit.style.display = 'none';
     }
+
+    /**
+     * Toggle status dropdown in details panel
+     */
+    function toggleStatusDropdown(event) {
+        event.stopPropagation();
+        const dropdown = document.getElementById('statusDropdown');
+        const isVisible = dropdown.style.display === 'block';
+
+        // Close all other dropdowns first
+        document.querySelectorAll('.status-dropdown').forEach(d => d.style.display = 'none');
+
+        // Toggle this dropdown
+        dropdown.style.display = isVisible ? 'none' : 'block';
+
+        // Add click listener to close dropdown when clicking outside
+        if (!isVisible) {
+            setTimeout(() => {
+                document.addEventListener('click', closeStatusDropdown);
+            }, 0);
+        }
+    }
+
+    /**
+     * Close status dropdown when clicking outside
+     */
+    function closeStatusDropdown() {
+        const dropdown = document.getElementById('statusDropdown');
+        if (dropdown) {
+            dropdown.style.display = 'none';
+        }
+        document.removeEventListener('click', closeStatusDropdown);
+    }
+
+    /**
+     * Change Ad Hoc request status
+     */
+    function changeAdHocStatus(rowIndex, newStatus) {
+        const panel = document.getElementById('detailsPanel');
+        const row = currentData.rows[rowIndex];
+        const headers = currentData.headers;
+        const statusIndex = headers.indexOf('Status');
+
+        // Update local data
+        row[statusIndex] = newStatus;
+
+        // Close dropdown
+        closeStatusDropdown();
+
+        // Update the status badge in the panel
+        const statusContainer = document.getElementById('detailStatus');
+        statusContainer.innerHTML = `
+            <div style="position: relative; display: inline-block;">
+                <button 
+                    onclick="toggleStatusDropdown(event)" 
+                    style="background: none; border: none; padding: 0; cursor: pointer;"
+                    aria-label="Change status"
+                >
+                    ${renderStatusBadge(newStatus)}
+                </button>
+                <div id="statusDropdown" class="status-dropdown" style="display: none;">
+                    <div class="status-dropdown-header">CHANGE STATUS</div>
+                    <button class="status-dropdown-item" onclick="changeAdHocStatus(${rowIndex}, 'New')" data-status="New">
+                        <span class="status-dot" style="background: #3b82f6;"></span>
+                        New
+                        ${newStatus === 'New' ? '<span style="margin-left: auto; color: #10b981;">✓</span>' : ''}
+                    </button>
+                    <button class="status-dropdown-item" onclick="changeAdHocStatus(${rowIndex}, 'In Progress')" data-status="In Progress">
+                        <span class="status-dot" style="background: #f59e0b;"></span>
+                        In Progress
+                        ${newStatus === 'In Progress' ? '<span style="margin-left: auto; color: #10b981;">✓</span>' : ''}
+                    </button>
+                    <button class="status-dropdown-item" onclick="changeAdHocStatus(${rowIndex}, 'Cancelled')" data-status="Cancelled">
+                        <span class="status-dot" style="background: #ef4444;"></span>
+                        Cancelled
+                        ${newStatus === 'Cancelled' ? '<span style="margin-left: auto; color: #10b981;">✓</span>' : ''}
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Update the status in the table row
+        const tableRow = document.querySelector(`tr[data-row-index="${rowIndex}"]`);
+        if (tableRow) {
+            const statusCell = tableRow.querySelector('td:nth-child(2)'); // Status is 2nd column in Ad Hoc
+            if (statusCell) {
+                statusCell.innerHTML = renderStatusBadge(newStatus);
+            }
+        }
+
+        // Update database in background
+        updateField(rowIndex, 'Status', newStatus);
+    }
+
+    /**
+     * Save deliverable evidence
+     */
+    function saveDeliverableEvidence(rowIndex, evidence) {
+        const row = currentData.rows[rowIndex];
+        const headers = currentData.headers;
+        const deliverableIndex = headers.indexOf('Deliverable Evidence');
+
+        // Update local data
+        row[deliverableIndex] = evidence;
+
+        // Update database
+        updateField(rowIndex, 'Deliverable Evidence', evidence);
+    }
+
+    /**
+     * Mark Ad Hoc request as complete
+     */
+    function markAdHocComplete(rowIndex) {
+        const deliverableInput = document.getElementById('deliverableInput');
+        const deliverableValue = deliverableInput ? deliverableInput.value.trim() : '';
+
+        // Validate that deliverable evidence is provided
+        if (!deliverableValue) {
+            alert('Please provide a link to the dashboard or file in the Deliverable Evidence field before marking as complete.');
+            deliverableInput.focus();
+            return;
+        }
+
+        const row = currentData.rows[rowIndex];
+        const headers = currentData.headers;
+        const statusIndex = headers.indexOf('Status');
+        const deliverableIndex = headers.indexOf('Deliverable Evidence');
+
+        // Update local data
+        row[statusIndex] = 'Completed';
+        row[deliverableIndex] = deliverableValue;
+
+        // Update the status badge in the panel
+        const statusContainer = document.getElementById('detailStatus');
+        statusContainer.innerHTML = `
+            <div style="position: relative; display: inline-block;">
+                <button 
+                    onclick="toggleStatusDropdown(event)" 
+                    style="background: none; border: none; padding: 0; cursor: pointer;"
+                    aria-label="Change status"
+                >
+                    ${renderStatusBadge('Completed')}
+                </button>
+                <div id="statusDropdown" class="status-dropdown" style="display: none;">
+                    <div class="status-dropdown-header">CHANGE STATUS</div>
+                    <button class="status-dropdown-item" onclick="changeAdHocStatus(${rowIndex}, 'New')" data-status="New">
+                        <span class="status-dot" style="background: #3b82f6;"></span>
+                        New
+                    </button>
+                    <button class="status-dropdown-item" onclick="changeAdHocStatus(${rowIndex}, 'In Progress')" data-status="In Progress">
+                        <span class="status-dot" style="background: #f59e0b;"></span>
+                        In Progress
+                    </button>
+                    <button class="status-dropdown-item" onclick="changeAdHocStatus(${rowIndex}, 'Cancelled')" data-status="Cancelled">
+                        <span class="status-dot" style="background: #ef4444;"></span>
+                        Cancelled
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Update the status in the table row
+        const tableRow = document.querySelector(`tr[data-row-index="${rowIndex}"]`);
+        if (tableRow) {
+            const statusCell = tableRow.querySelector('td:nth-child(2)'); // Status is 2nd column
+            if (statusCell) {
+                statusCell.innerHTML = renderStatusBadge('Completed');
+            }
+        }
+
+        // Update database with both status and deliverable evidence
+        const updates = {
+            'Status': 'Completed',
+            'Deliverable Evidence': deliverableValue
+        };
+
+        updateMultipleFields(rowIndex, updates, function () {
+            // Show success message
+            alert('✅ Request marked as complete!');
+
+            // Close the panel
+            closeDetails();
+
+            // Reload data to refresh the table
+            setTimeout(() => loadData(currentTab), 300);
+        });
+    }
+
 
     /**
      * ========================================
