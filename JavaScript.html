@@ -285,7 +285,7 @@
             // Assignee Column
             const tdAssignee = document.createElement('td');
             const assignee = row[assigneeIndex];
-            tdAssignee.innerHTML = renderAssigneeCell(assignee, rowIndex);
+            tdAssignee.innerHTML = renderAssigneeCell(assignee);
             tr.appendChild(tdAssignee);
 
             // Deadline Column
@@ -385,25 +385,21 @@
     /**
      * Render assignee cell
      * @param {string} assignee - Assignee email
-     * @param {number} rowIndex - Row index for updating
      * @returns {string} HTML
      */
-    function renderAssigneeCell(assignee, rowIndex) {
-        const options = teamMembers.map(member => {
-            const selected = member === assignee ? 'selected' : '';
-            return `<option value="${escapeHtml(member)}" ${selected}>${escapeHtml(member)}</option>`;
-        }).join('');
+    function renderAssigneeCell(assignee) {
+        if (!assignee || assignee.trim() === '') {
+            return '<span class="unassigned">Unassigned</span>';
+        }
 
-        // Add "Unassigned" option at the beginning
-        const unassignedSelected = (!assignee || assignee.trim() === '') ? 'selected' : '';
-        const allOptions = `<option value="" ${unassignedSelected}>Unassigned</option>${options}`;
+        const initial = assignee.charAt(0).toUpperCase();
+        const name = assignee.split('@')[0];
 
         return `
-            <select class="assignee-select" 
-                    onchange="updateAssigneeFromTable(${rowIndex}, this.value)" 
-                    onclick="event.stopPropagation()">
-                ${allOptions}
-            </select>
+            <div class="assignee-cell">
+                <div class="assignee-avatar">${initial}</div>
+                <span class="assignee-name">${escapeHtml(name)}</span>
+            </div>
         `;
     }
 
