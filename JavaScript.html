@@ -25,10 +25,17 @@
         google.script.run
             .withSuccessHandler(function (email) {
                 userEmail = email;
-                document.getElementById('userEmail').textContent = userEmail;
 
-                // Set user avatar (first letter of email)
-                const firstLetter = userEmail.charAt(0).toUpperCase();
+                // Extract name from email (part before @)
+                const userName = email.split('@')[0];
+                // Capitalize first letter of each word (e.g., "ipalacio" -> "Ipalacio")
+                const displayName = userName.charAt(0).toUpperCase() + userName.slice(1);
+
+                document.getElementById('userEmail').textContent = email;
+                document.querySelector('.user-name').textContent = displayName;
+
+                // Set user avatar (first letter of name)
+                const firstLetter = displayName.charAt(0).toUpperCase();
                 document.getElementById('userAvatar').textContent = firstLetter;
 
                 // Now load team members and data
@@ -38,6 +45,7 @@
                 console.error('Error getting user email:', error);
                 userEmail = 'unknown@ucsd.edu';
                 document.getElementById('userEmail').textContent = 'Error loading email';
+                document.querySelector('.user-name').textContent = 'Unknown User';
                 // Still try to load data
                 loadTeamMembersAndData();
             })
@@ -86,6 +94,14 @@
         // Update top bar title
         const title = tabName === 'DB_ADHOCS' ? 'Ad Hoc Requests Queue' : 'Project Portfolio';
         document.getElementById('topBarTitle').textContent = title;
+
+        // Show/hide filters bar (only for Ad Hoc Requests)
+        const filtersBar = document.querySelector('.filters-bar');
+        if (tabName === 'DB_ADHOCS') {
+            filtersBar.style.display = 'flex';
+        } else {
+            filtersBar.style.display = 'none';
+        }
 
         // Load data
         loadData(tabName);
@@ -232,7 +248,6 @@
         tableBody.innerHTML = '';
 
         // Get column indices
-        const priorityIndex = data.headers.indexOf('Priority');
         const titleIndex = data.headers.indexOf('The Request');
         const statusIndex = data.headers.indexOf('Status');
         const assigneeIndex = data.headers.indexOf('Assignee');
@@ -245,12 +260,6 @@
             const tr = document.createElement('tr');
             tr.dataset.rowIndex = rowIndex;
             tr.onclick = () => openDetails(row, data.headers);
-
-            // Priority Column
-            const tdPriority = document.createElement('td');
-            const priority = row[priorityIndex] || 'Low';
-            tdPriority.innerHTML = renderPriorityIcon(priority);
-            tr.appendChild(tdPriority);
 
             // Request Column (Title + Metadata)
             const tdRequest = document.createElement('td');
@@ -491,8 +500,8 @@
         const statusIndex = headers.indexOf('Status');
         const assigneeIndex = headers.indexOf('Assignee');
         const justificationIndex = headers.indexOf('Business Justification');
-        const filtersIndex = headers.indexOf('Filters Needed');
-        const outputIndex = headers.indexOf('Output Format');
+        const filtersIndex = headers.indexOf('Required Filters / Inclusions');
+        const outputIndex = headers.indexOf('Output Format Expectation');
         const requestorIndex = headers.indexOf('Email Address');
         const deliverableIndex = headers.indexOf('Deliverable Evidence');
 
@@ -505,13 +514,14 @@
         const requestor = row[requestorIndex] || 'Unknown';
         const deliverable = row[deliverableIndex] || '';
 
-        // Update header
-        document.getElementById('detailId').textContent = generateRequestId(0);
+        // Store current row index for updates
+        const rowIndex = currentData.rows.indexOf(row);
+        panel.dataset.rowIndex = rowIndex;
+
+        // Update header with correct request ID
+        document.getElementById('detailId').textContent = generateRequestId(rowIndex);
         document.getElementById('detailTitle').textContent = title;
         document.getElementById('detailStatus').innerHTML = renderStatusBadge(status);
-
-        // Store current row index for updates
-        panel.dataset.rowIndex = currentData.rows.indexOf(row);
 
         // Build details body
         const assigneeInitial = assignee ? assignee.charAt(0).toUpperCase() : '?';
@@ -607,7 +617,6 @@
                 >
                 <div class="action-buttons">
                     <button class="btn-complete">Mark Complete</button>
-                    <button class="btn-reject">Reject</button>
                 </div>
             </div>
         `;
