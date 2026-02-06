@@ -413,8 +413,8 @@
         // Filter data based on current view
         const filteredData = filterData(data);
 
-        // Calculate stats
-        calculateStats(filteredData);
+        // Calculate stats (removed as stats section is gone)
+        // calculateStats(filteredData);
 
         // Check if filtered data is empty
         if (filteredData.rows.length === 0) {
@@ -475,6 +475,7 @@
         const deadlineIndex = headers.indexOf('Hard Deadline');
         const idIndex = headers.indexOf('Timestamp');
         const requestorIndex = headers.indexOf('Email Address');
+        const requestIdIndex = headers.indexOf('Request ID'); // New column
 
         // Create data rows
         filteredData.rows.forEach((row, rowIndex) => {
@@ -487,7 +488,7 @@
             const title = row[titleIndex] || 'Untitled Request';
             const requestor = row[requestorIndex] || 'Unknown';
             const timestamp = formatTimestamp(row[idIndex]);
-            const requestId = generateRequestId(rowIndex);
+            const requestId = row[requestIdIndex] || 'PENDING';
 
             tdRequest.innerHTML = `
                 <div class="request-title">${escapeHtml(title)}</div>
@@ -914,14 +915,7 @@
         }
     }
 
-    /**
-     * Generate request ID
-     * @param {number} index - Row index
-     * @returns {string} Request ID
-     */
-    function generateRequestId(index) {
-        return `REQ-${1000 + index}`;
-    }
+
 
     /**
      * Format timestamp for display
@@ -995,6 +989,7 @@
         const outputIndex = headers.indexOf('Output Format Expectation');
         const requestorIndex = headers.indexOf('Email Address');
         const deliverableIndex = headers.indexOf('Deliverable Evidence');
+        const requestIdIndex = headers.indexOf('Request ID'); // New column
 
         const title = row[titleIndex] || 'Untitled Request';
         const status = row[statusIndex] || 'New';
@@ -1004,9 +999,10 @@
         const output = row[outputIndex] || 'Not specified';
         const requestor = row[requestorIndex] || 'Unknown';
         const deliverable = row[deliverableIndex] || '';
+        const requestId = row[requestIdIndex] || 'PENDING';
 
         // Update header
-        document.getElementById('detailId').textContent = generateRequestId(rowIndex);
+        document.getElementById('detailId').textContent = requestId;
         document.getElementById('detailTitle').textContent = title;
 
         // Render clickable status badge with dropdown

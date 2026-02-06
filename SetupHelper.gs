@@ -29,7 +29,8 @@ function setupTaskManagementColumns() {
       'Status',
       'Deliverable Evidence',
       'Last Modified',
-      'Modified By'
+      'Modified By',
+      'Request ID'
     ];
     
     // Check which columns are missing
@@ -160,6 +161,73 @@ function initializeExistingRows() {
 }
 
 /**
+ * Backfill Request IDs for existing rows
+ * Run this AFTER setupTaskManagementColumns()
+ */
+function backfillRequestIds() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('DB_ADHOCS');
+    
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert('Error: DB_ADHOCS sheet not found!');
+      return;
+    }
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      SpreadsheetApp.getUi().alert('No data rows to backfill.');
+      return;
+    }
+    
+    // Get headers
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // Find Request ID column
+    const requestIdCol = headers.indexOf('Request ID') + 1;
+    
+    if (requestIdCol === 0) {
+      SpreadsheetApp.getUi().alert('Error: "Request ID" column not found. Run setupTaskManagementColumns() first.');
+      return;
+    }
+    
+    // Process rows
+    let updatedCount = 0;
+    const values = sheet.getRange(2, requestIdCol, lastRow - 1, 1).getValues();
+    
+    // Prepare updates
+    const updates = values.map((row, index) => {
+      // Row index in sheet is index + 2
+      // ID should be REQ-1000 + (physical row index - 1) -> consistent with 1000 + lastRow logic for new rows?
+      // For new rows: nextIdNumber = 1000 + destinationSheet.getLastRow() (where lastRow is before append).
+      // So if 1 row exists (header), next is row 2. ID = 1001.
+      // Here, physical row 2 --> ID 1001.
+      // physical row 3 --> ID 1002.
+      // Formula: 1000 + (index + 2 - 1) = 1000 + index + 1
+      
+      if (!row[0] || row[0] === '') {
+        updatedCount++;
+        return [`REQ-${1000 + index + 1}`];
+      }
+      return [row[0]];
+    });
+    
+    // Bulk update
+    if (updatedCount > 0) {
+      sheet.getRange(2, requestIdCol, updates.length, 1).setValues(updates);
+    }
+    
+    SpreadsheetApp.getUi().alert(
+      `✅ Success!\n\nBackfilled ${updatedCount} missing Request IDs.\n` +
+      `Existing IDs were preserved.`
+    );
+    
+  } catch (error) {
+    SpreadsheetApp.getUi().alert(`❌ Error: ${error.message}`);
+    Logger.log(error);
+  }
+}
+
+/**
  * Create a custom menu for easy access to setup functions
  */
 function onOpen() {
@@ -167,6 +235,7 @@ function onOpen() {
   ui.createMenu('🔧 Task Management Setup')
     .addItem('1️⃣ Add Required Columns', 'setupTaskManagementColumns')
     .addItem('2️⃣ Initialize Existing Rows', 'initializeExistingRows')
+    .addItem('3️⃣ Backfill Request IDs', 'backfillRequestIds')
     .addSeparator()
     .addItem('📊 View Dashboard', 'openDashboard')
     .addToUi();
@@ -220,7 +289,8 @@ function validateSheetStructure() {
       'Status',
       'Deliverable Evidence',
       'Last Modified',
-      'Modified By'
+      'Modified By',
+      'Request ID'
     ];
     
     const missingColumns = requiredColumns.filter(col => !headers.includes(col));

@@ -1876,38 +1876,18 @@
                 </div>
             </header>
 
-            <!-- Stats Dashboard -->
-            <div class="stats-section">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-content">
-                            <h3>Queue Depth</h3>
-                            <p class="stat-value" id="stat-total">0</p>
-                        </div>
-                        <div class="stat-icon blue">📥</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-content">
-                            <h3>Due &lt; 48 Hrs</h3>
-                            <p class="stat-value danger" id="stat-urgent">0</p>
-                        </div>
-                        <div class="stat-icon rose">⏰</div>
-                    </div>
-                </div>
-
-                <!-- Filters Bar -->
-                <div class="filters-bar">
-                    <div class="filter-buttons">
-                        <button class="filter-btn active" onclick="switchView('myTasks')" id="filter-my">
-                            My Active Tasks
-                        </button>
-                        <button class="filter-btn" onclick="switchView('allRequests')" id="filter-all">
-                            All Open Requests
-                        </button>
-                        <button class="filter-btn" onclick="switchView('archived')" id="filter-archived">
-                            Archived Requests
-                        </button>
-                    </div>
+            <!-- Filters Bar (Moved from Stats Section) -->
+            <div class="filters-bar" style="padding: 1.5rem 2rem 0;">
+                <div class="filter-buttons">
+                    <button class="filter-btn active" onclick="switchView('myTasks')" id="filter-my">
+                        My Active Tasks
+                    </button>
+                    <button class="filter-btn" onclick="switchView('allRequests')" id="filter-all">
+                        All Open Requests
+                    </button>
+                    <button class="filter-btn" onclick="switchView('archived')" id="filter-archived">
+                        Archived Requests
+                    </button>
                 </div>
             </div>
 

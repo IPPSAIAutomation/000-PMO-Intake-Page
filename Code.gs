@@ -64,7 +64,8 @@ const CONFIG = {
     DELIVERABLE_EVIDENCE_COLUMN: 'Deliverable Evidence',
     NOTES_COLUMN: 'Notes',
     LAST_MODIFIED_COLUMN: 'Last Modified',
-    MODIFIED_BY_COLUMN: 'Modified By'
+    MODIFIED_BY_COLUMN: 'Modified By',
+    REQUEST_ID_COLUMN: 'Request ID'
   },
   
   // Team Members for Assignee Dropdown
@@ -92,6 +93,9 @@ const CONFIG = {
  * @param {Object} e - Form submission event object
  */
 function handleFormSubmit(e) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
   try {
     // Validate event object
     if (!e || !e.values) {
@@ -134,6 +138,8 @@ function handleFormSubmit(e) {
     sendErrorNotification(error);
     
     throw error; // Re-throw to ensure form submission is marked as failed
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -167,6 +173,17 @@ function buildRowData(sourceValues, mapping, destinationSheet) {
     } else if (header === CONFIG.METADATA.MODIFIED_BY_COLUMN) {
       rowData.push(Session.getActiveUser().getEmail());
       
+    } else if (header === CONFIG.METADATA.REQUEST_ID_COLUMN) {
+      // Generate ID based on row count (1000 + rowIndex)
+      // Destination sheet rows + 1 (for the new row being added)
+      // If 1 header row, lastRow is 1. New ID is 1002 (since logic was 1000+rowIndex and row 2 is index 1 or 2 depending on perspective).
+      // Wait, prompt said: REQ-${1000 + rowIndex}. 
+      // If we use lastRow + 1:
+      // Row 2 -> 1002.
+      // If we want 1001 for first item, we can do 1000 + lastRow (if lastRow includes header).
+      const nextId = 1000 + destinationSheet.getLastRow();
+      rowData.push(`REQ-${nextId}`);
+
     } else {
       // Empty value for unmapped columns
       rowData.push('');
