@@ -8,6 +8,7 @@
     // Global state
     let currentTab = 'DB_ADHOCS';
     let currentView = 'myTasks'; // 'myTasks' or 'allRequests'
+    let currentProjectView = 'pending'; // 'pending', 'roadmap', or 'archive'
     let currentData = null;
     let teamMembers = [];
     let userEmail = '';
@@ -101,16 +102,31 @@
 
         const activeButton = tabName === 'DB_ADHOCS' ?
             document.getElementById('nav-adhoc') :
-            document.getElementById('nav-projects');
+            document.getElementById('nav-pending'); // Default to pending view for projects
 
         activeButton.classList.add('active');
 
         // Update current tab
         currentTab = tabName;
 
+        // If switching to projects, default to pending view
+        if (tabName === 'DB_PROJECTS') {
+            currentProjectView = 'pending';
+        }
+
         // Update top bar title
         const title = tabName === 'DB_ADHOCS' ? 'Ad Hoc Requests Queue' : 'Project Intake & Prioritization';
         document.getElementById('topBarTitle').textContent = title;
+
+        // Show/hide stats section (only for Ad Hoc Requests)
+        const statsSection = document.querySelector('.stats-section');
+        if (statsSection) {
+            if (tabName === 'DB_ADHOCS') {
+                statsSection.style.display = 'block';
+            } else {
+                statsSection.style.display = 'none';
+            }
+        }
 
         // Show/hide filters bar (only for Ad Hoc Requests)
         const filtersBar = document.querySelector('.filters-bar');
@@ -118,6 +134,15 @@
             filtersBar.style.display = 'flex';
         } else {
             filtersBar.style.display = 'none';
+        }
+
+        // Hide matrix container for Ad Hoc tab
+        const matrixContainer = document.getElementById('matrixContainer');
+        if (matrixContainer) {
+            if (tabName === 'DB_ADHOCS') {
+                matrixContainer.classList.add('hidden');
+            }
+            // Note: Matrix visibility for project views is handled in renderProjectTable()
         }
 
         // Update table headers based on tab
@@ -128,20 +153,76 @@
     }
 
     /**
+     * Switch between project views
+     * @param {string} viewName - Name of the project view ('pending', 'roadmap', 'archive')
+     */
+    function switchProjectView(viewName) {
+        // Update active state on sidebar nav buttons
+        document.querySelectorAll('.nav-button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+
+        // Activate the clicked button
+        const buttonId = `nav-${viewName}`;
+        const activeButton = document.getElementById(buttonId);
+        if (activeButton) {
+            activeButton.classList.add('active');
+        }
+
+        // Update current tab and view
+        currentTab = 'DB_PROJECTS';
+        currentProjectView = viewName;
+
+        // Update top bar title based on view
+        const titles = {
+            'pending': 'Project Intake & Prioritization - Pending Review',
+            'roadmap': 'Project Intake & Prioritization - Active Roadmap',
+            'archive': 'Project Intake & Prioritization - Archive'
+        };
+        document.getElementById('topBarTitle').textContent = titles[viewName] || 'Project Intake & Prioritization';
+
+        // Hide stats section (not used for projects)
+        const statsSection = document.querySelector('.stats-section');
+        if (statsSection) {
+            statsSection.style.display = 'none';
+        }
+
+        // Hide filters bar (not used for projects)
+        const filtersBar = document.querySelector('.filters-bar');
+        filtersBar.style.display = 'none';
+
+        // Update table headers
+        updateTableHeaders('DB_PROJECTS');
+
+        // Load data
+        loadData('DB_PROJECTS');
+    }
+
+    /**
      * Update table headers based on current tab
      */
     function updateTableHeaders(tabName) {
         const tableHead = document.querySelector('thead tr');
 
         if (tabName === 'DB_PROJECTS') {
-            // Project table headers
-            tableHead.innerHTML = `
-                <th>Project Title</th>
-                <th>Executive Sponsor</th>
-                <th>Status</th>
-                <th>Tech Effort</th>
-                <th>Score</th>
-            `;
+            // Project table headers - vary by view
+            if (currentProjectView === 'pending') {
+                tableHead.innerHTML = `
+                    <th>Project Title</th>
+                    <th>Executive Sponsor</th>
+                    <th>Status</th>
+                    <th>Tech Effort</th>
+                    <th>AI Strategy</th>
+                `;
+            } else {
+                // roadmap and archive views
+                tableHead.innerHTML = `
+                    <th>Project Title</th>
+                    <th>Executive Sponsor</th>
+                    <th>Status</th>
+                    <th>Final Score</th>
+                `;
+            }
         } else {
             // Ad Hoc table headers
             tableHead.innerHTML = `
@@ -392,17 +473,65 @@
         const statusIndex = headers.indexOf('Status');
         const techEffortIndex = headers.indexOf('Tech Effort');
         const finalScoreIndex = headers.indexOf('Final Score');
+        const aiStrategyIndex = headers.indexOf('AI Strategy Score');
+        const aiImpactIndex = headers.indexOf('AI Impact Score');
+
+        // Filter data based on current project view
+        let viewFilteredRows = filteredData.rows;
+        if (currentProjectView === 'pending') {
+            viewFilteredRows = filteredData.rows.filter(row => {
+                const status = row[statusIndex] || '';
+                // Treat blank/empty status as "Pending Review" (new submissions)
+                return status === 'Pending Review' || status === 'New' || status === '' || status.trim() === '';
+            });
+        } else if (currentProjectView === 'roadmap') {
+            viewFilteredRows = filteredData.rows.filter(row => {
+                const status = row[statusIndex] || '';
+                return status === 'Approved' || status === 'In Progress';
+            });
+            // Sort by Final Score descending (highest priority first)
+            viewFilteredRows.sort((a, b) => {
+                const scoreA = parseFloat(a[finalScoreIndex]) || 0;
+                const scoreB = parseFloat(b[finalScoreIndex]) || 0;
+                return scoreB - scoreA; // Descending order
+            });
+        } else if (currentProjectView === 'archive') {
+            viewFilteredRows = filteredData.rows.filter(row => {
+                const status = row[statusIndex] || '';
+                return status === 'Completed' || status === 'Rejected';
+            });
+        }
+
+        // Show/hide matrix container based on view
+        const matrixContainer = document.getElementById('matrixContainer');
+        if (currentProjectView === 'pending') {
+            matrixContainer.classList.remove('hidden');
+            // Render matrix bubbles
+            renderMatrixBubbles(viewFilteredRows, headers);
+        } else {
+            matrixContainer.classList.add('hidden');
+        }
 
         // Create data rows
-        filteredData.rows.forEach((row, rowIndex) => {
+        viewFilteredRows.forEach((row, rowIndex) => {
+            // Find the original row index in the full dataset
+            const originalRowIndex = filteredData.rows.indexOf(row);
+
             const tr = document.createElement('tr');
-            tr.dataset.rowIndex = rowIndex;
-            tr.onclick = () => openDetails(row, headers);
+            tr.dataset.rowIndex = originalRowIndex;
+
+            // Only attach onclick for 'roadmap' view
+            if (currentProjectView === 'roadmap') {
+                tr.onclick = () => openDetails(row, headers);
+                tr.style.cursor = 'pointer';
+            } else {
+                tr.style.cursor = 'default';
+            }
 
             // Project Title Column
             const tdTitle = document.createElement('td');
             const title = row[titleIndex] || 'Untitled Project';
-            const projectId = `PROJ-${String(rowIndex + 1).padStart(3, '0')}`;
+            const projectId = `PROJ-${String(originalRowIndex + 1).padStart(3, '0')}`;
 
             tdTitle.innerHTML = `
                 <div class="request-title">${escapeHtml(title)}</div>
@@ -419,29 +548,153 @@
             // Status Column
             const tdStatus = document.createElement('td');
             const status = row[statusIndex] || 'Pending Review';
-            tdStatus.innerHTML = renderStatusBadge(status);
+            // Use blue badge with play icon for "In Progress" in roadmap view
+            if (currentProjectView === 'roadmap' && status === 'In Progress') {
+                tdStatus.innerHTML = `<span class="status-badge status-in-progress-blue">${escapeHtml(status)}</span>`;
+            } else {
+                tdStatus.innerHTML = renderStatusBadge(status);
+            }
             tr.appendChild(tdStatus);
 
-            // Tech Effort Column (Visual bars)
-            const tdEffort = document.createElement('td');
-            const techEffort = parseInt(row[techEffortIndex]) || 0;
+            // View-specific columns
+            if (currentProjectView === 'pending') {
+                // Tech Effort Column (Visual bars)
+                const tdEffort = document.createElement('td');
+                const techEffort = parseInt(row[techEffortIndex]) || 0;
 
-            const bars = [1, 2, 3].map(level => {
-                const isActive = techEffort >= level;
-                return `<div style="width: 0.5rem; height: 1rem; border-radius: 0.125rem; background: ${isActive ? 'var(--slate-400)' : 'var(--slate-100)'}; display: inline-block;"></div>`;
-            }).join('');
+                const bars = [1, 2, 3].map(level => {
+                    const isActive = techEffort >= level;
+                    return `<div style="width: 0.5rem; height: 1rem; border-radius: 0.125rem; background: ${isActive ? 'var(--slate-400)' : 'var(--slate-100)'}; display: inline-block;"></div>`;
+                }).join('');
 
-            tdEffort.innerHTML = `<div style="display: flex; gap: 0.25rem;">${bars}</div>`;
-            tr.appendChild(tdEffort);
+                tdEffort.innerHTML = `<div style="display: flex; gap: 0.25rem;">${bars}</div>`;
+                tr.appendChild(tdEffort);
 
-            // Score Column
-            const tdScore = document.createElement('td');
-            const finalScore = parseFloat(row[finalScoreIndex]) || 0;
-            tdScore.innerHTML = `<span style="font-family: monospace; font-weight: 700; color: var(--slate-700); font-size: 0.875rem;">${finalScore > 0 ? finalScore.toFixed(1) : '-'}</span>`;
-            tr.appendChild(tdScore);
+                // AI Strategy Score Column
+                const tdAiScore = document.createElement('td');
+                const aiScore = parseInt(row[aiStrategyIndex]) || 0;
+                tdAiScore.innerHTML = `<span style="font-family: monospace; font-weight: 600; color: var(--slate-700); font-size: 0.875rem;">${aiScore > 0 ? aiScore : '-'}</span>`;
+                tr.appendChild(tdAiScore);
+            } else {
+                // Score Column (for roadmap and archive)
+                const tdScore = document.createElement('td');
+                const finalScore = parseFloat(row[finalScoreIndex]) || 0;
+                tdScore.innerHTML = `<span style="font-family: monospace; font-weight: 700; color: var(--slate-700); font-size: 0.875rem;">${finalScore > 0 ? finalScore.toFixed(1) : '-'}</span>`;
+                tr.appendChild(tdScore);
+            }
 
             tableBody.appendChild(tr);
         });
+    }
+
+    /**
+     * Render matrix bubbles for pending project view
+     * @param {Array} rows - Filtered project rows
+     * @param {Array} headers - Column headers
+     */
+    function renderMatrixBubbles(rows, headers) {
+        const bubblesContainer = document.getElementById('matrixBubbles');
+        if (!bubblesContainer) return;
+
+        // Clear existing bubbles
+        bubblesContainer.innerHTML = '';
+
+        // Get column indices
+        const titleIndex = headers.indexOf('Project Title');
+        const techEffortIndex = headers.indexOf('Tech Effort');
+        const aiStrategyIndex = headers.indexOf('AI Strategy Score');
+        const aiImpactIndex = headers.indexOf('AI Impact Score');
+
+        rows.forEach((row, index) => {
+            const title = row[titleIndex] || 'Untitled';
+            const techEffort = parseInt(row[techEffortIndex]) || 1;
+            const aiStrategy = parseInt(row[aiStrategyIndex]) || 0;
+            const aiImpact = parseInt(row[aiImpactIndex]) || 0;
+
+            // Skip if no AI scores
+            if (aiStrategy === 0 && aiImpact === 0) return;
+
+            // Calculate position (0-100%)
+            const position = calculateBubblePosition(techEffort, aiStrategy);
+
+            // Calculate size based on impact (20-60px)
+            const size = 20 + (aiImpact / 10) * 40;
+
+            // Get color based on quadrant
+            const color = getQuadrantColor(techEffort, aiStrategy);
+
+            // Create bubble element
+            const bubble = document.createElement('div');
+            bubble.className = 'matrix-bubble';
+            bubble.style.left = `${position.x}%`;
+            bubble.style.top = `${position.y}%`;
+            bubble.style.width = `${size}px`;
+            bubble.style.height = `${size}px`;
+            bubble.style.background = color.bg;
+            bubble.style.borderColor = color.border;
+            bubble.style.transform = 'translate(-50%, -50%)';
+
+            // Add tooltip
+            const tooltip = document.createElement('div');
+            tooltip.className = 'matrix-bubble-tooltip';
+            tooltip.textContent = `${title} (Strategy: ${aiStrategy}, Impact: ${aiImpact}, Effort: ${techEffort})`;
+            bubble.appendChild(tooltip);
+
+            bubblesContainer.appendChild(bubble);
+        });
+    }
+
+    /**
+     * Calculate bubble position on matrix
+     * @param {number} techEffort - Tech effort (1-3)
+     * @param {number} aiStrategy - AI strategy score (1-10)
+     * @returns {Object} Position {x, y} in percentage
+     */
+    function calculateBubblePosition(techEffort, aiStrategy) {
+        // X-axis: Tech Effort (1-3) -> 0-100%
+        // Lower effort = left (0%), higher effort = right (100%)
+        const x = ((techEffort - 1) / 2) * 100;
+
+        // Y-axis: AI Strategy Score (1-10) -> 100-0% (inverted because high is at top)
+        // Higher strategy = top (0%), lower strategy = bottom (100%)
+        const y = 100 - ((aiStrategy - 1) / 9) * 100;
+
+        return { x, y };
+    }
+
+    /**
+     * Get quadrant color based on position
+     * @param {number} techEffort - Tech effort (1-3)
+     * @param {number} aiStrategy - AI strategy score (1-10)
+     * @returns {Object} Color {bg, border}
+     */
+    function getQuadrantColor(techEffort, aiStrategy) {
+        const isHighEffort = techEffort >= 2;
+        const isHighStrategy = aiStrategy >= 6;
+
+        if (isHighStrategy && !isHighEffort) {
+            // Q1: High Impact, Low Effort (Green)
+            return { bg: 'rgba(16, 185, 129, 0.6)', border: 'rgba(16, 185, 129, 0.8)' };
+        } else if (isHighStrategy && isHighEffort) {
+            // Q2: High Impact, High Effort (Blue)
+            return { bg: 'rgba(59, 130, 246, 0.6)', border: 'rgba(59, 130, 246, 0.8)' };
+        } else if (!isHighStrategy && isHighEffort) {
+            // Q3: Low Impact, High Effort (Red)
+            return { bg: 'rgba(239, 68, 68, 0.6)', border: 'rgba(239, 68, 68, 0.8)' };
+        } else {
+            // Q4: Low Impact, Low Effort (Slate)
+            return { bg: 'rgba(100, 116, 139, 0.6)', border: 'rgba(100, 116, 139, 0.8)' };
+        }
+    }
+
+    /**
+     * Toggle scoring guide modal
+     */
+    function toggleScoringModal() {
+        const modal = document.getElementById('scoringModal');
+        if (modal) {
+            modal.classList.toggle('hidden');
+        }
     }
 
     /**
@@ -967,29 +1220,106 @@
                     </div>
                 </div>
 
-                <div>
-                    <h3 style="font-size: 0.875rem; font-weight: 700; color: var(--slate-800); margin-bottom: 0.75rem;">Committee Decision</h3>
-                    <div style="display: flex; gap: 0.75rem;">
-                        <button 
-                            onclick="handleProjectDecision(${rowIndex}, 'Approved')"
-                            style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid ${status === 'Approved' ? '#059669' : 'var(--slate-200)'}; background: ${status === 'Approved' ? '#059669' : 'white'}; color: ${status === 'Approved' ? 'white' : '#059669'}; font-weight: 500; cursor: pointer; transition: all 0.2s;"
-                            onmouseover="if('${status}' !== 'Approved') this.style.background='#ecfdf5'"
-                            onmouseout="if('${status}' !== 'Approved') this.style.background='white'"
-                        >
-                            <span>👍</span> Approve
-                        </button>
-                        <button 
-                            onclick="handleProjectDecision(${rowIndex}, 'Rejected')"
-                            style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid ${status === 'Rejected' ? '#dc2626' : 'var(--slate-200)'}; background: ${status === 'Rejected' ? '#dc2626' : 'white'}; color: ${status === 'Rejected' ? 'white' : '#dc2626'}; font-weight: 500; cursor: pointer; transition: all 0.2s;"
-                            onmouseover="if('${status}' !== 'Rejected') this.style.background='#fef2f2'"
-                            onmouseout="if('${status}' !== 'Rejected') this.style.background='white'"
-                        >
-                            <span>👎</span> Reject
-                        </button>
+                ${currentProjectView === 'pending' ? `
+                    <!-- Committee Decision (Pending View Only) -->
+                    <div>
+                        <h3 style="font-size: 0.875rem; font-weight: 700; color: var(--slate-800); margin-bottom: 0.75rem;">Committee Decision</h3>
+                        <div style="display: flex; gap: 0.75rem;">
+                            <button 
+                                onclick="handleProjectDecision(${rowIndex}, 'Approved')"
+                                style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid ${status === 'Approved' ? '#059669' : 'var(--slate-200)'}; background: ${status === 'Approved' ? '#059669' : 'white'}; color: ${status === 'Approved' ? 'white' : '#059669'}; font-weight: 500; cursor: pointer; transition: all 0.2s;"
+                                onmouseover="if('${status}' !== 'Approved') this.style.background='#ecfdf5'"
+                                onmouseout="if('${status}' !== 'Approved') this.style.background='white'"
+                            >
+                                <span>👍</span> Approve
+                            </button>
+                            <button 
+                                onclick="handleProjectDecision(${rowIndex}, 'Rejected')"
+                                style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid ${status === 'Rejected' ? '#dc2626' : 'var(--slate-200)'}; background: ${status === 'Rejected' ? '#dc2626' : 'white'}; color: ${status === 'Rejected' ? 'white' : '#dc2626'}; font-weight: 500; cursor: pointer; transition: all 0.2s;"
+                                onmouseover="if('${status}' !== 'Rejected') this.style.background='#fef2f2'"
+                                onmouseout="if('${status}' !== 'Rejected') this.style.background='white'"
+                            >
+                                <span>👎</span> Reject
+                            </button>
+                        </div>
                     </div>
-                </div>
+                ` : currentProjectView === 'roadmap' ? `
+                    <!-- Roadmap Actions -->
+                    <div>
+                        <h3 style="font-size: 0.875rem; font-weight: 700; color: var(--slate-800); margin-bottom: 0.75rem;">Project Actions</h3>
+                        ${status === 'Approved' ? `
+                            <button 
+                                onclick="handleStartProject(${rowIndex})"
+                                style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 0.5rem; border: none; background: var(--blue-600); color: white; font-weight: 500; cursor: pointer; transition: all 0.2s;"
+                                onmouseover="this.style.background='var(--blue-700)'"
+                                onmouseout="this.style.background='var(--blue-600)'"
+                            >
+                                <span>▶</span> Start Project
+                            </button>
+                        ` : status === 'In Progress' ? `
+                            <button 
+                                onclick="handleMarkProjectComplete(${rowIndex})"
+                                style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 0.5rem; border: none; background: #10b981; color: white; font-weight: 500; cursor: pointer; transition: all 0.2s;"
+                                onmouseover="this.style.background='#059669'"
+                                onmouseout="this.style.background='#10b981'"
+                            >
+                                <span>✓</span> Mark Complete
+                            </button>
+                        ` : ''}
+                    </div>
+                ` : ''}
             </section>
         `;
+    }
+
+    /**
+     * Handle Start Project (Roadmap View)
+     */
+    function handleStartProject(rowIndex) {
+        const row = currentData.rows[rowIndex];
+        const headers = currentData.headers;
+        const statusIndex = headers.indexOf('Status');
+
+        // Update local data
+        row[statusIndex] = 'In Progress';
+
+        // Update UI
+        const statusElement = document.getElementById('detailStatus');
+        if (statusElement) {
+            statusElement.innerHTML = renderStatusBadge('In Progress');
+        }
+
+        // Update database
+        updateField(rowIndex, 'Status', 'In Progress', function () {
+            // Close panel and reload to refresh the table
+            closeDetails();
+            setTimeout(() => loadData(currentTab), 300);
+        });
+    }
+
+    /**
+     * Handle Mark Project Complete (Roadmap View)
+     */
+    function handleMarkProjectComplete(rowIndex) {
+        const row = currentData.rows[rowIndex];
+        const headers = currentData.headers;
+        const statusIndex = headers.indexOf('Status');
+
+        // Update local data
+        row[statusIndex] = 'Completed';
+
+        // Update UI
+        const statusElement = document.getElementById('detailStatus');
+        if (statusElement) {
+            statusElement.innerHTML = renderStatusBadge('Completed');
+        }
+
+        // Update database
+        updateField(rowIndex, 'Status', 'Completed', function () {
+            // Close panel and reload to refresh the table
+            closeDetails();
+            setTimeout(() => loadData(currentTab), 300);
+        });
     }
 
     /**

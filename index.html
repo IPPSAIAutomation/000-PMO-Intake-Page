@@ -1109,6 +1109,325 @@
 
 
         /* ========================================
+       MATRIX CONTAINER
+       ======================================== */
+
+        .matrix-container {
+            margin: 0 2rem 2rem;
+            background: white;
+            border-radius: 0.75rem;
+            border: 1px solid var(--slate-200);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .matrix-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .matrix-header h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--slate-800);
+        }
+
+        .btn-scoring-guide {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.375rem;
+            border: 1px solid var(--slate-300);
+            background: white;
+            color: var(--slate-700);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-scoring-guide:hover {
+            background: var(--slate-50);
+            border-color: var(--blue-500);
+            color: var(--blue-600);
+        }
+
+        .matrix-grid {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 1px;
+            background: var(--slate-300);
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+
+        .matrix-quadrant {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .matrix-q1 {
+            background: #d1fae5;
+            grid-column: 1;
+            grid-row: 1;
+        }
+
+        .matrix-q2 {
+            background: #dbeafe;
+            grid-column: 2;
+            grid-row: 1;
+        }
+
+        .matrix-q3 {
+            background: #fee2e2;
+            grid-column: 2;
+            grid-row: 2;
+        }
+
+        .matrix-q4 {
+            background: #f1f5f9;
+            grid-column: 1;
+            grid-row: 2;
+        }
+
+        .quadrant-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--slate-400);
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            line-height: 1.3;
+        }
+
+        .matrix-bubbles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .matrix-bubble {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(59, 130, 246, 0.6);
+            border: 2px solid rgba(59, 130, 246, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .matrix-bubble:hover {
+            transform: scale(1.1);
+            z-index: 10;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        }
+
+        .matrix-bubble-tooltip {
+            position: absolute;
+            bottom: calc(100% + 0.5rem);
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--slate-900);
+            color: white;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 100;
+        }
+
+        .matrix-bubble:hover .matrix-bubble-tooltip {
+            opacity: 1;
+        }
+
+        .matrix-axis-label {
+            position: absolute;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--slate-600);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .matrix-y-axis {
+            left: -2rem;
+            top: 50%;
+            transform: translateY(-50%) rotate(-90deg);
+            transform-origin: center;
+        }
+
+        .matrix-x-axis {
+            bottom: -2rem;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* ========================================
+       SCORING MODAL
+       ======================================== */
+
+        .scoring-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .scoring-modal-backdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            cursor: pointer;
+        }
+
+        .scoring-modal-content {
+            position: relative;
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: var(--shadow-xl);
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .scoring-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--slate-200);
+            background: var(--slate-50);
+        }
+
+        .scoring-modal-header h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--slate-800);
+        }
+
+        .scoring-modal-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .scoring-section {
+            margin-bottom: 2rem;
+        }
+
+        .scoring-section h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--slate-800);
+            margin-bottom: 0.5rem;
+        }
+
+        .scoring-section p {
+            font-size: 0.875rem;
+            color: var(--slate-600);
+            margin-bottom: 1rem;
+        }
+
+        .scoring-scale {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .scoring-scale-item {
+            padding: 0.75rem;
+            background: var(--slate-50);
+            border-radius: 0.375rem;
+            border-left: 3px solid var(--blue-500);
+            font-size: 0.875rem;
+            color: var(--slate-700);
+        }
+
+        .scoring-scale-item strong {
+            color: var(--slate-900);
+            font-weight: 600;
+        }
+
+        .scoring-formula {
+            background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            border: 1px solid #c7d2fe;
+        }
+
+        .scoring-formula h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #4c1d95;
+            margin-bottom: 0.75rem;
+        }
+
+        .formula {
+            font-family: monospace;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #4f46e5;
+            margin-bottom: 0.5rem;
+        }
+
+        .formula-note {
+            font-size: 0.875rem;
+            color: #6366f1;
+            font-style: italic;
+        }
+
+        /* ========================================
+       STATUS BADGE VARIATIONS
+       ======================================== */
+
+        .status-in-progress-blue {
+            background: var(--blue-100);
+            color: var(--blue-700);
+            border-color: var(--blue-200);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .status-in-progress-blue::before {
+            content: '▶';
+            font-size: 0.625rem;
+        }
+
+        /* ========================================
        RESPONSIVE
        ======================================== */
 
@@ -1125,8 +1444,12 @@
                 grid-template-columns: 1fr;
             }
 
-            .search-input {
-                width: 12rem;
+            .matrix-container {
+                margin: 0 1rem 1rem;
+            }
+
+            .matrix-grid {
+                height: 300px;
             }
         }
     </style>
@@ -1153,9 +1476,21 @@
                     <span class="nav-badge" id="badge-new">0</span>
                 </button>
 
-                <button class="nav-button" onclick="switchTab('DB_PROJECTS')" id="nav-projects">
-                    <span class="nav-button-icon">📊</span>
-                    <span>Project Requests</span>
+                <div class="nav-section-title" style="margin-top: 1.5rem;">Projects</div>
+
+                <button class="nav-button" onclick="switchProjectView('pending')" id="nav-pending">
+                    <span class="nav-button-icon">🔍</span>
+                    <span>Pending Review</span>
+                </button>
+
+                <button class="nav-button" onclick="switchProjectView('roadmap')" id="nav-roadmap">
+                    <span class="nav-button-icon">🚀</span>
+                    <span>Active Roadmap</span>
+                </button>
+
+                <button class="nav-button" onclick="switchProjectView('archive')" id="nav-archive">
+                    <span class="nav-button-icon">📦</span>
+                    <span>Archive</span>
                 </button>
             </nav>
 
@@ -1175,6 +1510,9 @@
             <!-- Top Bar -->
             <header class="top-bar">
                 <h1 class="top-bar-title" id="topBarTitle">Ad Hoc Requests Queue</h1>
+                <div class="top-bar-actions">
+                    <!-- Future action buttons can go here -->
+                </div>
             </header>
 
             <!-- Stats Dashboard -->
@@ -1193,13 +1531,6 @@
                             <p class="stat-value danger" id="stat-urgent">0</p>
                         </div>
                         <div class="stat-icon rose">⏰</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-content">
-                            <h3>Avg Turnaround</h3>
-                            <p class="stat-value">1.2 Days</p>
-                        </div>
-                        <div class="stat-icon emerald">✓</div>
                     </div>
                 </div>
 
@@ -1230,6 +1561,38 @@
                 <div class="empty-icon">📭</div>
                 <h3>No requests found</h3>
                 <p>There are no requests in this category yet.</p>
+            </div>
+
+            <!-- Matrix Container (for Project Pending Review) -->
+            <div id="matrixContainer" class="matrix-container hidden">
+                <div class="matrix-header">
+                    <h3>Project Prioritization Matrix</h3>
+                    <button class="btn-scoring-guide" onclick="toggleScoringModal()">📖 Scoring Guide</button>
+                </div>
+                <div class="matrix-grid">
+                    <!-- Y-axis label -->
+                    <div class="matrix-axis-label matrix-y-axis">AI Strategy Score (High ↑)</div>
+
+                    <!-- Quadrants -->
+                    <div class="matrix-quadrant matrix-q2">
+                        <span class="quadrant-label">High Impact<br>High Effort</span>
+                    </div>
+                    <div class="matrix-quadrant matrix-q1">
+                        <span class="quadrant-label">High Impact<br>Low Effort</span>
+                    </div>
+                    <div class="matrix-quadrant matrix-q3">
+                        <span class="quadrant-label">Low Impact<br>High Effort</span>
+                    </div>
+                    <div class="matrix-quadrant matrix-q4">
+                        <span class="quadrant-label">Low Impact<br>Low Effort</span>
+                    </div>
+
+                    <!-- Bubbles will be inserted here dynamically -->
+                    <div id="matrixBubbles" class="matrix-bubbles"></div>
+
+                    <!-- X-axis label -->
+                    <div class="matrix-axis-label matrix-x-axis">Tech Effort (Low → High)</div>
+                </div>
             </div>
 
             <!-- Data Grid -->
@@ -1270,6 +1633,82 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Scoring Guide Modal -->
+    <div id="scoringModal" class="scoring-modal hidden">
+        <div class="scoring-modal-backdrop" onclick="toggleScoringModal()"></div>
+        <div class="scoring-modal-content">
+            <div class="scoring-modal-header">
+                <h2>📊 Scoring Guide</h2>
+                <button class="btn-close" onclick="toggleScoringModal()">✕</button>
+            </div>
+            <div class="scoring-modal-body">
+                <div class="scoring-section">
+                    <h3>AI Strategy Score (1-10)</h3>
+                    <p>Measures alignment with organizational strategic priorities and long-term goals.</p>
+                    <div class="scoring-scale">
+                        <div class="scoring-scale-item">
+                            <strong>9-10:</strong> Critical strategic alignment, transformational impact
+                        </div>
+                        <div class="scoring-scale-item">
+                            <strong>7-8:</strong> Strong strategic value, significant advancement
+                        </div>
+                        <div class="scoring-scale-item">
+                            <strong>5-6:</strong> Moderate strategic benefit, supports key initiatives
+                        </div>
+                        <div class="scoring-scale-item">
+                            <strong>3-4:</strong> Minor strategic value, tangential alignment
+                        </div>
+                        <div class="scoring-scale-item">
+                            <strong>1-2:</strong> Minimal strategic impact, operational only
+                        </div>
+                    </div>
+                </div>
+                <div class="scoring-section">
+                    <h3>AI Impact Score (1-10)</h3>
+                    <p>Quantifies the expected business impact and value delivered.</p>
+                    <div class="scoring-scale">
+                        <div class="scoring-scale-item">
+                            <strong>9-10:</strong> Enterprise-wide impact, major efficiency gains
+                        </div>
+                        <div class="scoring-scale-item">
+                            <strong>7-8:</strong> Department-level impact, measurable improvements
+                        </div>
+                        <div class="scoring-scale-item">
+                            <strong>5-6:</strong> Team-level impact, noticeable benefits
+                        </div>
+                        <div class="scoring-scale-item">
+                            <strong>3-4:</strong> Individual-level impact, incremental value
+                        </div>
+                        <div class="scoring-scale-item">
+                            <strong>1-2:</strong> Minimal impact, limited scope
+                        </div>
+                    </div>
+                </div>
+                <div class="scoring-section">
+                    <h3>Tech Effort (1-3)</h3>
+                    <p>Estimates the technical complexity and resource requirements.</p>
+                    <div class="scoring-scale">
+                        <div class="scoring-scale-item">
+                            <strong>1 (Low):</strong> Simple implementation, existing tools, &lt;1 week
+                        </div>
+                        <div class="scoring-scale-item">
+                            <strong>2 (Medium):</strong> Moderate complexity, some custom work, 1-4 weeks
+                        </div>
+                        <div class="scoring-scale-item">
+                            <strong>3 (High):</strong> Complex integration, significant development, &gt;4 weeks
+                        </div>
+                    </div>
+                </div>
+                <div class="scoring-formula">
+                    <h3>Final Prioritization Score</h3>
+                    <p class="formula">Final Score = (AI Strategy Score + AI Impact Score) / Tech Effort</p>
+                    <p class="formula-note">Higher scores indicate higher priority projects that deliver maximum value
+                        with optimal resource investment.</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Include JavaScript -->
