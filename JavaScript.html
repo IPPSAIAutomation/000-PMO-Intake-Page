@@ -191,6 +191,12 @@
         const filtersBar = document.querySelector('.filters-bar');
         filtersBar.style.display = 'none';
 
+        // Hide matrix container immediately to prevent ghosting
+        const matrixContainer = document.getElementById('matrixContainer');
+        if (matrixContainer) {
+            matrixContainer.classList.add('hidden');
+        }
+
         // Update table headers
         updateTableHeaders('DB_PROJECTS');
 
@@ -217,10 +223,13 @@
             } else {
                 // roadmap and archive views
                 tableHead.innerHTML = `
-                    <th>Project Title</th>
-                    <th>Executive Sponsor</th>
-                    <th>Status</th>
-                    <th>Final Score</th>
+                    <th>PROJECT TITLE</th>
+                    <th>EXEC SPONSOR</th>
+                    <th>STATUS</th>
+                    <th style="text-align: center;">STRATEGY</th>
+                    <th style="text-align: center;">IMPACT</th>
+                    <th>TECH EFFORT</th>
+                    <th style="text-align: right;">FINAL SCORE</th>
                 `;
             }
         } else {
@@ -1185,7 +1194,7 @@
         const problemIndex = headers.indexOf('Problem Statement');
         const impactDescIndex = headers.indexOf('Impact Quantification');
 
-        // Scoring Fields (New Columns)
+        // Scoring Fields
         const stratIndex = headers.indexOf('Strategy Score');
         const impactIndex = headers.indexOf('Impact Score');
         const dataIndex = headers.indexOf('Data Score');
@@ -1203,7 +1212,11 @@
         const impactDesc = row[impactDescIndex] || 'Not specified';
         const techNotes = row[techNotesIndex] || '';
 
-        // Parse Scores (Default to middle values if empty)
+        // Parse Scores (Default to 0/empty to show unset state if needed, or defaults)
+        // User requested: "Ensure projects can start with 'No scoring' (visual state) if the database values are empty."
+        // We will treat 0 or NaN as unset for visual sliders, but default to 1/5 for logic if needed, 
+        // OR better: visually indicate unset. For sliders, defaults are usually needed to render handle.
+        // Let's stick to defaults for now but ensure they can be updated.
         const stratScore = parseInt(row[stratIndex]) || 5;
         const impactScore = parseInt(row[impactIndex]) || 5;
 
@@ -1222,27 +1235,27 @@
 
         // Render Template
         detailsBody.innerHTML = `
-            <!-- Header Cards -->
-            <div class="details-grid-2">
-                <div class="info-card">
-                    <div class="label">Executive Sponsor</div>
-                    <div class="value">
-                        <div class="user-chip">
-                            <div class="chip-avatar">${sponsor.charAt(0)}</div>
-                            ${escapeHtml(sponsor)}
-                        </div>
+            <!-- Executive Sponsor (Full Width) -->
+            <div class="info-card full-width" style="margin-bottom: 1.5rem;">
+                <div class="label">Executive Sponsor</div>
+                <div class="value">
+                    <div class="user-chip">
+                        <div class="chip-avatar">${sponsor.charAt(0)}</div>
+                        ${escapeHtml(sponsor)}
                     </div>
-                </div>
-                <div class="info-card">
-                    <div class="label">Current Impact</div>
-                    <div class="value link" title="${escapeHtml(impactDesc)}">View Quantification</div>
                 </div>
             </div>
 
             <!-- Problem Statement -->
-            <div class="details-block">
+            <div class="details-block" style="margin-bottom: 1.5rem;">
                 <div class="label">Problem Statement</div>
-                <div class="text-block">${escapeHtml(problem)}</div>
+                <div class="text-block rich-text">${escapeHtml(problem)}</div>
+            </div>
+
+             <!-- Impact Quantification (Moved Below Problem) -->
+            <div class="details-block" style="margin-bottom: 2rem;">
+                <div class="label">Impact Quantification</div>
+                <div class="text-block rich-text">${escapeHtml(impactDesc)}</div>
             </div>
 
             <!-- Strategic Assessment (Sliders) -->
@@ -1336,11 +1349,14 @@
                 </div>
             </div>
 
-            <!-- Technical Notes -->
+            <!-- Technical Notes (Improved UI) -->
             <div class="details-block">
                 <div class="label">TECHNICAL CONSTRAINTS / NOTES</div>
-                <textarea class="notes-input" placeholder="Add technical constraints or review notes..."
-                    onblur="handleTechNotesChange(${rowIndex}, this.value)">${escapeHtml(techNotes)}</textarea>
+                <div class="input-wrapper">
+                    <textarea class="notes-input styled-textarea" 
+                        placeholder="Add specific technical requirements, limitations, or risk factors..."
+                        onblur="handleTechNotesChange(${rowIndex}, this.value)">${escapeHtml(techNotes)}</textarea>
+                </div>
             </div>
 
             <!-- Real-Time Calculation Card -->
@@ -1823,14 +1839,35 @@
     /**
      * Handle Project Decision (Approve/Reject)
      */
+    /**
+     * Handle Project Decision (Approve/Reject)
+     * Calculates Final Score and writes back to database
+     */
     function handleProjectDecision(rowIndex, decision) {
-        // Update local data immediately (optimistic UI)
+        // Calculate the Final Score one last time to ensure it's fresh
         const row = currentData.rows[rowIndex];
         const headers = currentData.headers;
-        const statusIndex = headers.indexOf('Status');
-        row[statusIndex] = decision;
 
-        // Update the status badge in the panel (without full re-render)
+        // Get latest values from local data (which should be updated by sliders/buttons)
+        // OR read from DOM if we want super-safety, but local data is kept in sync by handleScoreChange
+        const stratIndex = headers.indexOf('Strategy Score');
+        const impactIndex = headers.indexOf('Impact Score');
+        const techIndex = headers.indexOf('Tech Effort');
+
+        const strat = parseFloat(row[stratIndex]) || 5;
+        const impact = parseFloat(row[impactIndex]) || 5;
+        const effort = parseFloat(row[techIndex]) || 1;
+
+        const finalScore = calculateFinalScore(strat, impact, effort);
+
+        // Update local data immediately (optimistic UI)
+        const statusIndex = headers.indexOf('Status');
+        const finalScoreIndex = headers.indexOf('Final Score');
+
+        row[statusIndex] = decision;
+        if (finalScoreIndex !== -1) row[finalScoreIndex] = finalScore;
+
+        // Update the status/score in the panel (without full re-render)
         const statusElement = document.getElementById('detailStatus');
         if (statusElement) {
             statusElement.innerHTML = renderStatusBadge(decision);
@@ -1839,14 +1876,24 @@
         // Update the status in the table row (without full table re-render)
         const tableRow = document.querySelector(`tr[data-row-index="${rowIndex}"]`);
         if (tableRow) {
-            const statusCell = tableRow.querySelector('td:nth-child(3)'); // Status is 3rd column
+            const statusCell = tableRow.querySelector('td:nth-child(3)'); // Status is generally 3rd
             if (statusCell) {
                 statusCell.innerHTML = renderStatusBadge(decision);
             }
+            // Also update score cell if visible? (Maybe unnecessary complexity for now)
         }
 
         // Update database in background
-        updateField(rowIndex, 'Status', decision);
+        const updates = {
+            'Status': decision,
+            'Final Score': finalScore
+        };
+
+        updateMultipleFields(rowIndex, updates, function () {
+            console.log(`Decision saved: ${decision}, Final Score: ${finalScore}`);
+            // Force reload to ensure sorting/filtering rules apply
+            setTimeout(() => loadData(currentTab), 500);
+        });
     }
 
     /**
