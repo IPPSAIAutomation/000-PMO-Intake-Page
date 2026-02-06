@@ -236,7 +236,7 @@
     }
 
     /**
-     * Switch between views (My Active Tasks vs All Requests)
+     * Switch between views (My Active Tasks vs All Open Requests vs Archived)
      * @param {string} viewName - Name of the view
      */
     function switchView(viewName) {
@@ -245,11 +245,18 @@
             btn.classList.remove('active');
         });
 
-        const activeButton = viewName === 'myTasks' ?
-            document.getElementById('filter-my') :
-            document.getElementById('filter-all');
+        let activeButton;
+        if (viewName === 'myTasks') {
+            activeButton = document.getElementById('filter-my');
+        } else if (viewName === 'allRequests') {
+            activeButton = document.getElementById('filter-all');
+        } else if (viewName === 'archived') {
+            activeButton = document.getElementById('filter-archived');
+        }
 
-        activeButton.classList.add('active');
+        if (activeButton) {
+            activeButton.classList.add('active');
+        }
 
         // Update current view
         currentView = viewName;
@@ -326,13 +333,13 @@
      * @returns {Object} Filtered data
      */
     function filterData(data) {
-        // Only filter for Ad Hoc Requests in "My Active Tasks" view
-        if (currentTab !== 'DB_ADHOCS' || currentView !== 'myTasks') {
-            console.log('Not filtering - currentTab:', currentTab, 'currentView:', currentView);
+        // Only filter for Ad Hoc Requests
+        if (currentTab !== 'DB_ADHOCS') {
+            console.log('Not filtering - currentTab:', currentTab);
             return data;
         }
 
-        console.log('Filter Debug - Current user email:', userEmail);
+        console.log('Filter Debug - Current view:', currentView, 'Current user email:', userEmail);
 
         const assigneeIndex = data.headers.indexOf('Assignee');
         const statusIndex = data.headers.indexOf('Status');
@@ -342,22 +349,49 @@
             return data;
         }
 
-        // Filter rows where Assignee matches current user AND Status is not "Completed"
-        const filteredRows = data.rows.filter(row => {
-            const assignee = row[assigneeIndex];
-            const status = row[statusIndex];
+        let filteredRows;
 
-            // Match assignee (case-insensitive, partial match on email)
-            const isMyTask = assignee && assignee.toLowerCase().includes(userEmail.toLowerCase());
-            const isNotCompleted = status !== 'Completed';
+        if (currentView === 'myTasks') {
+            // Filter rows where Assignee matches current user AND Status is not "Completed" or "Cancelled"
+            filteredRows = data.rows.filter(row => {
+                const assignee = row[assigneeIndex];
+                const status = row[statusIndex];
 
-            // Debug log for each row
-            if (assignee) {
-                console.log(`Row - Assignee: "${assignee}", Status: "${status}", Match: ${isMyTask}, NotCompleted: ${isNotCompleted}`);
-            }
+                // Match assignee (case-insensitive, partial match on email)
+                const isMyTask = assignee && assignee.toLowerCase().includes(userEmail.toLowerCase());
+                const isOpen = status !== 'Completed' && status !== 'Cancelled';
 
-            return isMyTask && isNotCompleted;
-        });
+                // Debug log for each row
+                if (assignee) {
+                    console.log(`Row - Assignee: "${assignee}", Status: "${status}", Match: ${isMyTask}, IsOpen: ${isOpen}`);
+                }
+
+                return isMyTask && isOpen;
+            });
+        } else if (currentView === 'allRequests') {
+            // Filter rows where Status is "New" or "In Progress"
+            filteredRows = data.rows.filter(row => {
+                const status = row[statusIndex];
+                const isOpen = status === 'New' || status === 'In Progress';
+
+                console.log(`Row - Status: "${status}", IsOpen: ${isOpen}`);
+
+                return isOpen;
+            });
+        } else if (currentView === 'archived') {
+            // Filter rows where Status is "Completed" or "Cancelled"
+            filteredRows = data.rows.filter(row => {
+                const status = row[statusIndex];
+                const isArchived = status === 'Completed' || status === 'Cancelled';
+
+                console.log(`Row - Status: "${status}", IsArchived: ${isArchived}`);
+
+                return isArchived;
+            });
+        } else {
+            // Default: return all data
+            filteredRows = data.rows;
+        }
 
         console.log(`✅ Filtered ${filteredRows.length} rows from ${data.rows.length} total rows`);
 
@@ -1046,6 +1080,32 @@
                 </div>
             </div>
 
+            <!-- Notes Section -->
+            <div class="details-section" style="margin-bottom: 2rem;">
+                <div class="section-header">
+                    <h3 class="field-label" style="margin: 0;">
+                        <span class="field-icon" style="color: var(--amber-700);">📝</span>
+                        Analyst Notes
+                    </h3>
+                    <span style="font-size: 0.75rem; color: var(--slate-400);" id="notesCharCount">0 / 1000</span>
+                </div>
+                <div style="margin-top: 0.75rem;">
+                    <textarea 
+                        id="notesTextarea"
+                        class="notes-textarea"
+                        placeholder="Add status updates, cancellation reasons, or any relevant notes about this request..."
+                        maxlength="1000"
+                        rows="6"
+                        onblur="saveNotes(${rowIndex}, this.value)"
+                        oninput="updateNotesCharCount(this.value)"
+                    >${escapeHtml(row[headers.indexOf('Notes')] || '')}</textarea>
+                    <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--slate-400); display: flex; align-items: center; gap: 0.5rem;">
+                        <span>💡</span>
+                        <span>Notes are saved automatically and visible to all team members</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Action Area -->
             <div class="action-section">
                 <h3>Deliverable Evidence</h3>
@@ -1474,6 +1534,45 @@
 
         // Update database
         updateField(rowIndex, 'Deliverable Evidence', evidence);
+    }
+
+    /**
+     * Save notes
+     */
+    function saveNotes(rowIndex, notes) {
+        const row = currentData.rows[rowIndex];
+        const headers = currentData.headers;
+        const notesIndex = headers.indexOf('Notes');
+
+        // Update local data if Notes column exists
+        if (notesIndex !== -1) {
+            row[notesIndex] = notes;
+        }
+
+        // Update database
+        updateField(rowIndex, 'Notes', notes);
+
+        console.log(`Notes saved for row ${rowIndex}: ${notes.substring(0, 50)}...`);
+    }
+
+    /**
+     * Update notes character count
+     */
+    function updateNotesCharCount(notes) {
+        const charCount = document.getElementById('notesCharCount');
+        if (charCount) {
+            const length = notes ? notes.length : 0;
+            charCount.textContent = `${length} / 1000`;
+
+            // Change color if approaching limit
+            if (length > 900) {
+                charCount.style.color = 'var(--rose-600)';
+            } else if (length > 750) {
+                charCount.style.color = 'var(--amber-700)';
+            } else {
+                charCount.style.color = 'var(--slate-400)';
+            }
+        }
     }
 
     /**

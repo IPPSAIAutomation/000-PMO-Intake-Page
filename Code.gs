@@ -23,7 +23,7 @@ const CONFIG = {
   REQUEST_TYPE: {
     COLUMN_INDEX: 2, // "Which service category best fits your request?"
     ADHOC_VALUE: 'Decision Support & Ad-Hoc Analysis (One-time data pulls, specific numbers for urgent meetings, audit responses, or raw datasets.)', // UPDATE THIS to match your form's exact text for Ad Hoc
-    PROJECT_VALUES: ['Strategic Opportunity & Business Case (Evaluating new initiatives, defining requirements for large problems, or assessing feasibility.)', 'Forecasting & Scenario Modeling (Predictive analysis, "what-if" planning, or future resource modeling.)', 'Performance Dashboards & Reporting (Creating new automated dashboards, recurring reports, or long-term tracking tools.)'] // UPDATE THESE to match your form's project options
+    PROJECT_VALUES: ['Strategic Opportunity & Business Case (Evaluating new initiatives, defining requirements for large problems, or assessing feasibility.)', 'Forecasting & Scenario Modeling (Predictive analysis, "what-if" planning, or future resource modeling.)', 'Dashboards, Reporting & Bursts (Creating new automated dashboards, recurring reports, or automated report distribution.)'] // UPDATE THESE to match your form's project options
   },
   
   // Column Mappings for AD HOC Requests
@@ -62,13 +62,13 @@ const CONFIG = {
     STATUS_COLUMN: 'Status',
     ASSIGNEE_COLUMN: 'Assignee',
     DELIVERABLE_EVIDENCE_COLUMN: 'Deliverable Evidence',
+    NOTES_COLUMN: 'Notes',
     LAST_MODIFIED_COLUMN: 'Last Modified',
     MODIFIED_BY_COLUMN: 'Modified By'
   },
   
   // Team Members for Assignee Dropdown
   TEAM_MEMBERS: [
-    'Unassigned',
     'ipalacio@ucsd.edu',
     'k9thomas@UCSD.EDU',
     'cal050@UCSD.EDU'

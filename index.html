@@ -903,6 +903,30 @@
             margin-bottom: 0.75rem;
         }
 
+        .notes-textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--slate-300);
+            font-size: 0.875rem;
+            font-family: var(--font-family);
+            color: var(--slate-700);
+            line-height: 1.5;
+            resize: vertical;
+            transition: var(--transition);
+            background: white;
+        }
+
+        .notes-textarea:focus {
+            outline: none;
+            border-color: var(--blue-500);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .notes-textarea::placeholder {
+            color: var(--slate-400);
+        }
+
         .action-input:focus {
             outline: none;
             border-color: var(--blue-500);
@@ -1537,11 +1561,14 @@
                 <!-- Filters Bar -->
                 <div class="filters-bar">
                     <div class="filter-buttons">
-                        <button class="filter-btn" onclick="switchView('allRequests')" id="filter-all">
-                            All Requests
-                        </button>
                         <button class="filter-btn active" onclick="switchView('myTasks')" id="filter-my">
                             My Active Tasks
+                        </button>
+                        <button class="filter-btn" onclick="switchView('allRequests')" id="filter-all">
+                            All Open Requests
+                        </button>
+                        <button class="filter-btn" onclick="switchView('archived')" id="filter-archived">
+                            Archived Requests
                         </button>
                     </div>
                 </div>
