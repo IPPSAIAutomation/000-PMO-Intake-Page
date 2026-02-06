@@ -408,6 +408,7 @@
     function renderTable(data) {
         const tableBody = document.getElementById('tableBody');
         const dataGridSection = document.getElementById('dataGridSection');
+        const tableHead = document.querySelector('thead tr');
 
         // Filter data based on current view
         const filteredData = filterData(data);
@@ -423,11 +424,38 @@
 
         // Clear existing content
         tableBody.innerHTML = '';
+        tableHead.innerHTML = ''; // Clear headers
 
-        // Render based on current tab
+        // Set Headers based on Tab
         if (currentTab === 'DB_PROJECTS') {
+            if (currentProjectView === 'pending') {
+                tableHead.innerHTML = `
+                    <th>PROJECT TITLE</th>
+                    <th>EXEC SPONSOR</th>
+                    <th>STATUS</th>
+                    <th style="text-align: center;">STRATEGY</th>
+                    <th style="text-align: center;">IMPACT</th>
+                    <th>TECH EFFORT (AVG)</th>
+                    <th style="text-align: right;">FINAL SCORE</th>
+                `;
+            } else {
+                tableHead.innerHTML = `
+                    <th>PROJECT TITLE</th>
+                    <th>EXEC SPONSOR</th>
+                    <th>STATUS</th>
+                    <th style="text-align: right;">FINAL SCORE</th>
+                `;
+            }
             renderProjectTable(filteredData, data.headers, tableBody);
         } else {
+            // Ad Hoc Headers
+            tableHead.innerHTML = `
+                <th>REQUEST</th>
+                <th>STATUS</th>
+                <th>ASSIGNEE</th>
+                <th>DEADLINE</th>
+                <th style="width: 48px; text-align: right;">ACTION</th>
+            `;
             renderAdHocTable(filteredData, data.headers, tableBody);
         }
 
@@ -500,13 +528,22 @@
     /**
      * Render Project Requests Table
      */
+    /**
+     * Render Project Requests Table
+     */
     function renderProjectTable(filteredData, headers, tableBody) {
         // Get column indices
         const titleIndex = headers.indexOf('Project Title');
         const sponsorIndex = headers.indexOf('Executive Sponsor');
         const statusIndex = headers.indexOf('Status');
-        const techEffortIndex = headers.indexOf('Tech Effort');
+
+        // New Scoring Columns
+        const stratIndex = headers.indexOf('Strategy Score');
+        const impactIndex = headers.indexOf('Impact Score');
+        const techEffortIndex = headers.indexOf('Tech Effort'); // Average 1-5
         const finalScoreIndex = headers.indexOf('Final Score');
+
+        // Fallback to AI columns if new ones empty (migration support)
         const aiStrategyIndex = headers.indexOf('AI Strategy Score');
         const aiImpactIndex = headers.indexOf('AI Impact Score');
 
@@ -515,7 +552,6 @@
         if (currentProjectView === 'pending') {
             viewFilteredRows = filteredData.rows.filter(row => {
                 const status = row[statusIndex] || '';
-                // Treat blank/empty status as "Pending Review" (new submissions)
                 return status === 'Pending Review' || status === 'New' || status === '' || status.trim() === '';
             });
         } else if (currentProjectView === 'roadmap') {
@@ -523,12 +559,7 @@
                 const status = row[statusIndex] || '';
                 return status === 'Approved' || status === 'In Progress';
             });
-            // Sort by Final Score descending (highest priority first)
-            viewFilteredRows.sort((a, b) => {
-                const scoreA = parseFloat(a[finalScoreIndex]) || 0;
-                const scoreB = parseFloat(b[finalScoreIndex]) || 0;
-                return scoreB - scoreA; // Descending order
-            });
+            viewFilteredRows.sort((a, b) => (parseFloat(b[finalScoreIndex]) || 0) - (parseFloat(a[finalScoreIndex]) || 0));
         } else if (currentProjectView === 'archive') {
             viewFilteredRows = filteredData.rows.filter(row => {
                 const status = row[statusIndex] || '';
@@ -540,7 +571,6 @@
         const matrixContainer = document.getElementById('matrixContainer');
         if (currentProjectView === 'pending') {
             matrixContainer.classList.remove('hidden');
-            // Render matrix bubbles
             renderMatrixBubbles(viewFilteredRows, headers);
         } else {
             matrixContainer.classList.add('hidden');
@@ -548,29 +578,20 @@
 
         // Create data rows
         viewFilteredRows.forEach((row, rowIndex) => {
-            // Find the original row index in the full dataset
             const originalRowIndex = filteredData.rows.indexOf(row);
-
             const tr = document.createElement('tr');
             tr.dataset.rowIndex = originalRowIndex;
 
-            // Only attach onclick for 'roadmap' view
-            if (currentProjectView === 'roadmap') {
-                tr.onclick = () => openDetails(row, headers);
-                tr.style.cursor = 'pointer';
-            } else {
-                tr.style.cursor = 'default';
-            }
-
-            // Project Title Column
+            // Project Title Column (Clickable to open drawer)
             const tdTitle = document.createElement('td');
             const title = row[titleIndex] || 'Untitled Project';
             const projectId = `PROJ-${String(originalRowIndex + 1).padStart(3, '0')}`;
 
             tdTitle.innerHTML = `
-                <div class="request-title">${escapeHtml(title)}</div>
+                <div class="request-title" style="cursor: pointer; color: var(--blue-600); font-weight: 600;">${escapeHtml(title)}</div>
                 <div class="request-meta">${projectId}</div>
             `;
+            tdTitle.onclick = () => openDetails(row, headers);
             tr.appendChild(tdTitle);
 
             // Executive Sponsor Column
@@ -582,7 +603,6 @@
             // Status Column
             const tdStatus = document.createElement('td');
             const status = row[statusIndex] || 'Pending Review';
-            // Use blue badge with play icon for "In Progress" in roadmap view
             if (currentProjectView === 'roadmap' && status === 'In Progress') {
                 tdStatus.innerHTML = `<span class="status-badge status-in-progress-blue">${escapeHtml(status)}</span>`;
             } else {
@@ -590,32 +610,50 @@
             }
             tr.appendChild(tdStatus);
 
-            // View-specific columns
-            if (currentProjectView === 'pending') {
-                // Tech Effort Column (Visual bars)
-                const tdEffort = document.createElement('td');
-                const techEffort = parseInt(row[techEffortIndex]) || 0;
+            // Strategy Score Column
+            const tdStrat = document.createElement('td');
+            // Use new column or fallback to AI column
+            const stratScore = parseInt(row[stratIndex]) || parseInt(row[aiStrategyIndex]) || 0;
+            tdStrat.innerHTML = `<div style="text-align: center; font-weight: 600; color: var(--slate-700);">${stratScore || '-'}</div>`;
+            tr.appendChild(tdStrat);
 
-                const bars = [1, 2, 3].map(level => {
-                    const isActive = techEffort >= level;
-                    return `<div style="width: 0.5rem; height: 1rem; border-radius: 0.125rem; background: ${isActive ? 'var(--slate-400)' : 'var(--slate-100)'}; display: inline-block;"></div>`;
-                }).join('');
+            // Impact Score Column
+            const tdImpact = document.createElement('td');
+            const impactScore = parseInt(row[impactIndex]) || parseInt(row[aiImpactIndex]) || 0;
+            tdImpact.innerHTML = `<div style="text-align: center; font-weight: 600; color: var(--slate-700);">${impactScore || '-'}</div>`;
+            tr.appendChild(tdImpact);
 
-                tdEffort.innerHTML = `<div style="display: flex; gap: 0.25rem;">${bars}</div>`;
-                tr.appendChild(tdEffort);
+            // Tech Effort Column (Visual Dots 1-5)
+            const tdEffort = document.createElement('td');
+            const techEffort = parseFloat(row[techEffortIndex]) || 1; // avg 1-5
 
-                // AI Strategy Score Column
-                const tdAiScore = document.createElement('td');
-                const aiScore = parseInt(row[aiStrategyIndex]) || 0;
-                tdAiScore.innerHTML = `<span style="font-family: monospace; font-weight: 600; color: var(--slate-700); font-size: 0.875rem;">${aiScore > 0 ? aiScore : '-'}</span>`;
-                tr.appendChild(tdAiScore);
-            } else {
-                // Score Column (for roadmap and archive)
-                const tdScore = document.createElement('td');
-                const finalScore = parseFloat(row[finalScoreIndex]) || 0;
-                tdScore.innerHTML = `<span style="font-family: monospace; font-weight: 700; color: var(--slate-700); font-size: 0.875rem;">${finalScore > 0 ? finalScore.toFixed(1) : '-'}</span>`;
-                tr.appendChild(tdScore);
+            // Create 5 dots visual
+            let dotsHtml = '';
+            for (let i = 1; i <= 5; i++) {
+                // Check if active (round to nearest integer for simple visual)
+                const isActive = Math.round(techEffort) >= i;
+                const color = isActive ? '#6366f1' : '#e2e8f0'; // Indigo vs Slate-200
+                dotsHtml += `<div style="width: 8px; height: 8px; border-radius: 50%; background: ${color};"></div>`;
             }
+
+            tdEffort.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: start; gap: 0.25rem;">
+                    <div style="display: flex; gap: 4px;">${dotsHtml}</div>
+                    <div style="font-size: 0.75rem; color: var(--slate-500); font-family: monospace;">${techEffort.toFixed(1)} / 5</div>
+                </div>
+            `;
+            tr.appendChild(tdEffort);
+
+            // Final Score Column
+            const tdFinal = document.createElement('td');
+            const finalScore = parseFloat(row[finalScoreIndex]) || 0;
+
+            tdFinal.innerHTML = `
+                <div style="font-size: 1.25rem; font-weight: 800; color: var(--slate-900); text-align: right;">
+                    ${finalScore > 0 ? finalScore.toFixed(1) : '-'}
+                </div>
+            `;
+            tr.appendChild(tdFinal);
 
             tableBody.appendChild(tr);
         });
@@ -636,26 +674,31 @@
         // Get column indices
         const titleIndex = headers.indexOf('Project Title');
         const techEffortIndex = headers.indexOf('Tech Effort');
-        const aiStrategyIndex = headers.indexOf('AI Strategy Score');
-        const aiImpactIndex = headers.indexOf('AI Impact Score');
+        // Try new columns, fallback to AI columns
+        const stratIndex = headers.indexOf('Strategy Score');
+        const impactIndex = headers.indexOf('Impact Score');
+        const aiStratIndex = headers.indexOf('AI Strategy Score');
+        const aiImpIndex = headers.indexOf('AI Impact Score');
 
         rows.forEach((row, index) => {
             const title = row[titleIndex] || 'Untitled';
-            const techEffort = parseInt(row[techEffortIndex]) || 1;
-            const aiStrategy = parseInt(row[aiStrategyIndex]) || 0;
-            const aiImpact = parseInt(row[aiImpactIndex]) || 0;
 
-            // Skip if no AI scores
-            if (aiStrategy === 0 && aiImpact === 0) return;
+            // Get values
+            const techEffort = parseFloat(row[techEffortIndex]) || 1; // 1-5 scale
+            const strategy = parseInt(row[stratIndex]) || parseInt(row[aiStratIndex]) || 0;
+            const impact = parseInt(row[impactIndex]) || parseInt(row[aiImpIndex]) || 0;
+
+            // Skip if no scores
+            if (strategy === 0 && impact === 0) return;
 
             // Calculate position (0-100%)
-            const position = calculateBubblePosition(techEffort, aiStrategy);
+            const position = calculateBubblePosition(techEffort, impact); // Using Impact for Y-axis as per screenshot design
 
-            // Calculate size based on impact (20-60px)
-            const size = 20 + (aiImpact / 10) * 40;
+            // Calculate size based on strategy/value (20-60px)
+            const size = 20 + (strategy / 10) * 40;
 
             // Get color based on quadrant
-            const color = getQuadrantColor(techEffort, aiStrategy);
+            const color = getQuadrantColor(techEffort, impact);
 
             // Create bubble element
             const bubble = document.createElement('div');
@@ -671,7 +714,7 @@
             // Add tooltip
             const tooltip = document.createElement('div');
             tooltip.className = 'matrix-bubble-tooltip';
-            tooltip.textContent = `${title} (Strategy: ${aiStrategy}, Impact: ${aiImpact}, Effort: ${techEffort})`;
+            tooltip.innerHTML = `<strong>${escapeHtml(title)}</strong><br>Strat: ${strategy} | Imp: ${impact} | Eff: ${techEffort}`;
             bubble.appendChild(tooltip);
 
             bubblesContainer.appendChild(bubble);
@@ -680,44 +723,45 @@
 
     /**
      * Calculate bubble position on matrix
-     * @param {number} techEffort - Tech effort (1-3)
-     * @param {number} aiStrategy - AI strategy score (1-10)
+     * @param {number} techEffort - Tech effort (1-5) -> X Axis
+     * @param {number} impact - Impact Score (1-10) -> Y Axis
      * @returns {Object} Position {x, y} in percentage
      */
-    function calculateBubblePosition(techEffort, aiStrategy) {
-        // X-axis: Tech Effort (1-3) -> 0-100%
-        // Lower effort = left (0%), higher effort = right (100%)
-        const x = ((techEffort - 1) / 2) * 100;
+    function calculateBubblePosition(techEffort, impact) {
+        // X-axis: Tech Effort (1-5) -> 0-100%
+        // 1=Left, 5=Right
+        const x = ((techEffort - 1) / 4) * 100;
 
-        // Y-axis: AI Strategy Score (1-10) -> 100-0% (inverted because high is at top)
-        // Higher strategy = top (0%), lower strategy = bottom (100%)
-        const y = 100 - ((aiStrategy - 1) / 9) * 100;
+        // Y-axis: Impact (1-10) -> 100-0% (inverted because high impact is at top)
+        // 10=Top(0%), 1=Bottom(100%)
+        const y = 100 - ((impact - 1) / 9) * 100;
 
         return { x, y };
     }
 
     /**
      * Get quadrant color based on position
-     * @param {number} techEffort - Tech effort (1-3)
-     * @param {number} aiStrategy - AI strategy score (1-10)
+     * @param {number} techEffort - Tech effort (1-5)
+     * @param {number} impact - Impact score (1-10)
      * @returns {Object} Color {bg, border}
      */
-    function getQuadrantColor(techEffort, aiStrategy) {
-        const isHighEffort = techEffort >= 2;
-        const isHighStrategy = aiStrategy >= 6;
+    function getQuadrantColor(techEffort, impact) {
+        // Thresholds: Effort > 2.5 is "High", Impact > 5 is "High"
+        const isHighEffort = techEffort > 2.5;
+        const isHighImpact = impact > 5;
 
-        if (isHighStrategy && !isHighEffort) {
-            // Q1: High Impact, Low Effort (Green)
-            return { bg: 'rgba(16, 185, 129, 0.6)', border: 'rgba(16, 185, 129, 0.8)' };
-        } else if (isHighStrategy && isHighEffort) {
-            // Q2: High Impact, High Effort (Blue)
-            return { bg: 'rgba(59, 130, 246, 0.6)', border: 'rgba(59, 130, 246, 0.8)' };
-        } else if (!isHighStrategy && isHighEffort) {
-            // Q3: Low Impact, High Effort (Red)
-            return { bg: 'rgba(239, 68, 68, 0.6)', border: 'rgba(239, 68, 68, 0.8)' };
+        if (isHighImpact && !isHighEffort) {
+            // Q1: High Impact, Low Effort (Success/Quick Win) - Green
+            return { bg: 'rgba(16, 185, 129, 0.2)', border: '#10b981' };
+        } else if (isHighImpact && isHighEffort) {
+            // Q2: High Impact, High Effort (Strategic) - Indigo/Blue
+            return { bg: 'rgba(99, 102, 241, 0.2)', border: '#6366f1' };
+        } else if (!isHighImpact && isHighEffort) {
+            // Q3: Low Impact, High Effort (Avoid) - Red
+            return { bg: 'rgba(239, 68, 68, 0.2)', border: '#ef4444' };
         } else {
-            // Q4: Low Impact, Low Effort (Slate)
-            return { bg: 'rgba(100, 116, 139, 0.6)', border: 'rgba(100, 116, 139, 0.8)' };
+            // Q4: Low Impact, Low Effort (Maintenance) - Slate/Gray
+            return { bg: 'rgba(148, 163, 184, 0.2)', border: '#94a3b8' };
         }
     }
 
@@ -1127,208 +1171,198 @@
     /**
      * Render Project Request Details (with AI Scoring & Prioritization)
      */
+    /**
+     * Render Project Request Details (Assessment & Scoring)
+     */
     function renderProjectDetails(row, headers, panel, detailsBody, rowIndex) {
         // Get project-specific data
         const titleIndex = headers.indexOf('Project Title');
         const statusIndex = headers.indexOf('Status');
         const sponsorIndex = headers.indexOf('Executive Sponsor');
         const problemIndex = headers.indexOf('Problem Statement');
-        const alignmentIndex = headers.indexOf('Strategic Alignment');
-        const impactIndex = headers.indexOf('Impact Quantification');
+        const impactDescIndex = headers.indexOf('Impact Quantification');
 
-        // AI Scoring fields
-        const aiScoredIndex = headers.indexOf('AI Scored');
-        const aiStrategyIndex = headers.indexOf('AI Strategy Score');
-        const aiImpactScoreIndex = headers.indexOf('AI Impact Score');
-        const aiJustificationIndex = headers.indexOf('AI Justification');
-
-        // PMO fields
-        const techEffortIndex = headers.indexOf('Tech Effort');
-        const techNotesIndex = headers.indexOf('Tech Notes');
+        // Scoring Fields (New Columns)
+        const stratIndex = headers.indexOf('Strategy Score');
+        const impactIndex = headers.indexOf('Impact Score');
+        const dataIndex = headers.indexOf('Data Score');
+        const stakeIndex = headers.indexOf('Stakeholder Score');
+        const implIndex = headers.indexOf('Implementation Score');
+        const techDistIndex = headers.indexOf('Tech Effort'); // Stores average
         const finalScoreIndex = headers.indexOf('Final Score');
+        const techNotesIndex = headers.indexOf('Tech Notes');
 
+        // Safe Getters
         const title = row[titleIndex] || 'Untitled Project';
         const status = row[statusIndex] || 'Pending Review';
         const sponsor = row[sponsorIndex] || 'Unknown';
         const problem = row[problemIndex] || 'No problem statement provided';
-        const alignment = row[alignmentIndex] || 'Not specified';
-        const impact = row[impactIndex] || 'Not specified';
-
-        const aiScored = row[aiScoredIndex] === 'TRUE' || row[aiScoredIndex] === true;
-        const aiStrategyScore = parseInt(row[aiStrategyIndex]) || 0;
-        const aiImpactScore = parseInt(row[aiImpactScoreIndex]) || 0;
-        const aiJustification = row[aiJustificationIndex] || '';
-
-        const techEffort = parseInt(row[techEffortIndex]) || 1;
+        const impactDesc = row[impactDescIndex] || 'Not specified';
         const techNotes = row[techNotesIndex] || '';
-        const finalScore = parseFloat(row[finalScoreIndex]) || 0;
+
+        // Parse Scores (Default to middle values if empty)
+        const stratScore = parseInt(row[stratIndex]) || 5;
+        const impactScore = parseInt(row[impactIndex]) || 5;
+
+        const dataScore = parseInt(row[dataIndex]) || 1;
+        const stakeScore = parseInt(row[stakeIndex]) || 1;
+        const implScore = parseInt(row[implIndex]) || 1;
+
+        // Calculate initial values
+        const avgTech = calculateAvgTech({ data: dataScore, stake: stakeScore, impl: implScore });
+        const finalScore = calculateFinalScore(stratScore, impactScore, avgTech);
 
         // Update header
         document.getElementById('detailId').textContent = `PROJ-${String(rowIndex + 1).padStart(3, '0')}`;
         document.getElementById('detailTitle').textContent = title;
         document.getElementById('detailStatus').innerHTML = renderStatusBadge(status);
 
-        // Render project-specific UI
+        // Render Template
         detailsBody.innerHTML = `
-            <!-- Basic Info Grid -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;">
-                <div style="padding: 0.75rem; background: var(--slate-50); border-radius: 0.5rem; border: 1px solid var(--slate-200);">
-                    <div style="font-size: 0.75rem; color: var(--slate-400); text-transform: uppercase; font-weight: 600; margin-bottom: 0.25rem;">Executive Sponsor</div>
-                    <div style="font-weight: 500; color: var(--slate-900);">${escapeHtml(sponsor)}</div>
+            <!-- Header Cards -->
+            <div class="details-grid-2">
+                <div class="info-card">
+                    <div class="label">Executive Sponsor</div>
+                    <div class="value">
+                        <div class="user-chip">
+                            <div class="chip-avatar">${sponsor.charAt(0)}</div>
+                            ${escapeHtml(sponsor)}
+                        </div>
+                    </div>
                 </div>
-                <div style="padding: 0.75rem; background: var(--slate-50); border-radius: 0.5rem; border: 1px solid var(--slate-200);">
-                    <div style="font-size: 0.75rem; color: var(--slate-400); text-transform: uppercase; font-weight: 600; margin-bottom: 0.25rem;">Impact</div>
-                    <div style="font-weight: 500; color: var(--slate-900); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(impact)}">View Quantification</div>
+                <div class="info-card">
+                    <div class="label">Current Impact</div>
+                    <div class="value link" title="${escapeHtml(impactDesc)}">View Quantification</div>
                 </div>
             </div>
 
             <!-- Problem Statement -->
-            <div style="margin-bottom: 2rem;">
-                <h3 style="font-weight: 600; color: var(--slate-900); margin-bottom: 0.5rem; font-size: 0.875rem;">Problem Statement</h3>
-                <p style="color: var(--slate-600); line-height: 1.6; font-size: 0.875rem;">${escapeHtml(problem)}</p>
+            <div class="details-block">
+                <div class="label">Problem Statement</div>
+                <div class="text-block">${escapeHtml(problem)}</div>
             </div>
 
-            <hr style="border: none; border-top: 1px solid var(--slate-100); margin: 2rem 0;">
+            <!-- Strategic Assessment (Sliders) -->
+            <div class="divider-title">
+                <span class="icon">📊</span> STRATEGIC ASSESSMENT
+            </div>
 
-            <!-- AI Scoring Section -->
-            <section id="aiScoringSection">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-                    <h3 style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; color: #4c1d95; font-size: 1rem;">
-                        <span style="font-size: 1.25rem;">✨</span>
-                        AI Strategic Assessment
-                    </h3>
-                    ${!aiScored ? `
-                        <button 
-                            id="aiScoreBtn"
-                            onclick="handleAiScore(${rowIndex})"
-                            style="display: flex; align-items: center; gap: 0.5rem; background: #4f46e5; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; border: none; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background 0.2s;"
-                            onmouseover="this.style.background='#4338ca'"
-                            onmouseout="this.style.background='#4f46e5'"
-                        >
-                            <span>🤖</span>
-                            <span>Have AI Score This</span>
-                        </button>
-                    ` : ''}
-                </div>
-
-                ${aiScored ? `
-                    <div style="background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); border-radius: 0.75rem; border: 1px solid #c7d2fe; padding: 1.25rem;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                            <div style="background: white; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #c7d2fe; box-shadow: 0 1px 2px rgba(0,0,0,0.05); text-align: center;">
-                                <div style="font-size: 1.5rem; font-weight: 700; color: #4f46e5;">${aiStrategyScore}</div>
-                                <div style="font-size: 0.75rem; color: #818cf8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Strategy Score</div>
-                            </div>
-                            <div style="background: white; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #c7d2fe; box-shadow: 0 1px 2px rgba(0,0,0,0.05); text-align: center;">
-                                <div style="font-size: 1.5rem; font-weight: 700; color: #4f46e5;">${aiImpactScore}</div>
-                                <div style="font-size: 0.75rem; color: #818cf8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Impact Score</div>
-                            </div>
+            <div class="assessment-card">
+                <!-- Strategy Slider -->
+                <div class="slider-container">
+                    <div class="slider-header">
+                        <div class="slider-label">
+                            🚀 Strategy Score
+                            <span class="sub-label">Alignment with organizational goals.</span>
                         </div>
-                        <div style="background: white; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #c7d2fe; font-size: 0.875rem; color: #4c1d95; font-style: italic;">
-                            "${escapeHtml(aiJustification)}"
-                        </div>
+                        <div class="slider-value" id="disp-strat">${stratScore}</div>
                     </div>
-                ` : `
-                    <div style="border: 2px dashed var(--slate-200); border-radius: 0.75rem; padding: 2rem; text-align: center; color: var(--slate-400); font-size: 0.875rem;">
-                        Click the button above to generate AI scores and justification.
-                    </div>
-                `}
-            </section>
-
-            <!-- PMO Technical Review -->
-            <section style="margin-top: 2rem; ${!aiScored ? 'opacity: 0.5; pointer-events: none; filter: grayscale(1);' : ''}">
-                <h3 style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; color: var(--slate-800); margin-bottom: 1rem; font-size: 1rem;">
-                    <span style="font-size: 1.25rem;">⚙️</span>
-                    PMO Technical Review
-                </h3>
-                <div style="margin-bottom: 1rem;">
-                    <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--slate-500); text-transform: uppercase; margin-bottom: 0.5rem;">Technical Effort Level (1-3)</label>
-                    <div style="display: flex; gap: 1rem;">
-                        ${[1, 2, 3].map(val => `
-                            <button
-                                onclick="handleTechEffortChange(${rowIndex}, ${val})"
-                                style="flex: 1; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid ${techEffort === val ? 'var(--slate-800)' : 'var(--slate-200)'}; background: ${techEffort === val ? 'var(--slate-800)' : 'white'}; color: ${techEffort === val ? 'white' : 'var(--slate-600)'}; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: all 0.2s;"
-                            >
-                                Level ${val}
-                            </button>
-                        `).join('')}
-                    </div>
-                </div>
-                <div>
-                    <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--slate-500); text-transform: uppercase; margin-bottom: 0.5rem;">Technical Constraints / Notes</label>
-                    <textarea 
-                        id="techNotesInput"
-                        onblur="handleTechNotesChange(${rowIndex}, this.value)"
-                        style="width: 100%; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--slate-200); font-size: 0.875rem; font-family: inherit; resize: vertical;"
-                        rows="2"
-                        placeholder="Enter technical justification..."
-                    >${escapeHtml(techNotes)}</textarea>
-                </div>
-            </section>
-
-            <!-- Final Scoring & Decision -->
-            <section style="padding-top: 1.5rem; border-top: 1px solid var(--slate-100); margin-top: 2rem; ${!aiScored ? 'opacity: 0.5; pointer-events: none;' : ''}">
-                <div style="background: var(--slate-900); border-radius: 0.75rem; padding: 1.25rem; color: white; margin-bottom: 1.5rem;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem;">
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span style="font-size: 1.25rem;">🧮</span>
-                            <span style="font-weight: 700;">Final Prioritization</span>
-                        </div>
-                        <div id="finalScoreDisplay" style="font-size: 2rem; font-weight: 700; color: #60a5fa;">${finalScore > 0 ? finalScore.toFixed(1) : '--'}</div>
-                    </div>
-                    <div style="font-size: 0.75rem; color: var(--slate-400); text-align: right; font-family: monospace;">
-                        (Strategy + Impact) / Tech Effort
+                    <input type="range" min="1" max="10" value="${stratScore}" 
+                        class="range-slider strat-slider"
+                        oninput="handleScoreChange(${rowIndex}, 'strat', this.value)">
+                    <div class="slider-range-labels">
+                        <span>1 (Low)</span>
+                        <span>10 (High)</span>
                     </div>
                 </div>
 
-                ${currentProjectView === 'pending' ? `
-                    <!-- Committee Decision (Pending View Only) -->
-                    <div>
-                        <h3 style="font-size: 0.875rem; font-weight: 700; color: var(--slate-800); margin-bottom: 0.75rem;">Committee Decision</h3>
-                        <div style="display: flex; gap: 0.75rem;">
-                            <button 
-                                onclick="handleProjectDecision(${rowIndex}, 'Approved')"
-                                style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid ${status === 'Approved' ? '#059669' : 'var(--slate-200)'}; background: ${status === 'Approved' ? '#059669' : 'white'}; color: ${status === 'Approved' ? 'white' : '#059669'}; font-weight: 500; cursor: pointer; transition: all 0.2s;"
-                                onmouseover="if('${status}' !== 'Approved') this.style.background='#ecfdf5'"
-                                onmouseout="if('${status}' !== 'Approved') this.style.background='white'"
-                            >
-                                <span>👍</span> Approve
-                            </button>
-                            <button 
-                                onclick="handleProjectDecision(${rowIndex}, 'Rejected')"
-                                style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid ${status === 'Rejected' ? '#dc2626' : 'var(--slate-200)'}; background: ${status === 'Rejected' ? '#dc2626' : 'white'}; color: ${status === 'Rejected' ? 'white' : '#dc2626'}; font-weight: 500; cursor: pointer; transition: all 0.2s;"
-                                onmouseover="if('${status}' !== 'Rejected') this.style.background='#fef2f2'"
-                                onmouseout="if('${status}' !== 'Rejected') this.style.background='white'"
-                            >
-                                <span>👎</span> Reject
-                            </button>
+                <div class="slider-divider"></div>
+
+                <!-- Impact Slider -->
+                <div class="slider-container">
+                    <div class="slider-header">
+                        <div class="slider-label">
+                            💎 Impact Score
+                            <span class="sub-label">Estimated ROI and operational benefit.</span>
                         </div>
+                        <div class="slider-value" id="disp-impact">${impactScore}</div>
                     </div>
-                ` : currentProjectView === 'roadmap' ? `
-                    <!-- Roadmap Actions -->
-                    <div>
-                        <h3 style="font-size: 0.875rem; font-weight: 700; color: var(--slate-800); margin-bottom: 0.75rem;">Project Actions</h3>
-                        ${status === 'Approved' ? `
-                            <button 
-                                onclick="handleStartProject(${rowIndex})"
-                                style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 0.5rem; border: none; background: var(--blue-600); color: white; font-weight: 500; cursor: pointer; transition: all 0.2s;"
-                                onmouseover="this.style.background='var(--blue-700)'"
-                                onmouseout="this.style.background='var(--blue-600)'"
-                            >
-                                <span>▶</span> Start Project
-                            </button>
-                        ` : status === 'In Progress' ? `
-                            <button 
-                                onclick="handleMarkProjectComplete(${rowIndex})"
-                                style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 0.5rem; border: none; background: #10b981; color: white; font-weight: 500; cursor: pointer; transition: all 0.2s;"
-                                onmouseover="this.style.background='#059669'"
-                                onmouseout="this.style.background='#10b981'"
-                            >
-                                <span>✓</span> Mark Complete
-                            </button>
-                        ` : ''}
+                    <input type="range" min="1" max="10" value="${impactScore}" 
+                        class="range-slider impact-slider"
+                        oninput="handleScoreChange(${rowIndex}, 'impact', this.value)">
+                    <div class="slider-range-labels">
+                        <span>1 (Low)</span>
+                        <span>10 (High)</span>
                     </div>
-                ` : ''}
-            </section>
+                </div>
+            </div>
+
+            <!-- Technical Review (3 Inputs) -->
+            <div class="divider-title">
+                <span class="icon">⚙️</span> PMO TECHNICAL REVIEW
+            </div>
+
+            <div class="tech-card">
+                <!-- 1. Data & Infrastructure -->
+                <div class="tech-input-row">
+                    <div class="tech-label">
+                        Data & Infrastructure
+                        <span class="tooltip">Complexity of data sources and pipeline needs.</span>
+                    </div>
+                    <div class="segment-control">
+                        ${renderSegmentOptions(rowIndex, 'data', dataScore)}
+                    </div>
+                </div>
+
+                <!-- 2. Stakeholder & Scope -->
+                <div class="tech-input-row">
+                    <div class="tech-label">
+                        Stakeholder & Scope
+                        <span class="tooltip">Number of departments and clarity of requirements.</span>
+                    </div>
+                    <div class="segment-control">
+                        ${renderSegmentOptions(rowIndex, 'stake', stakeScore)}
+                    </div>
+                </div>
+
+                <!-- 3. Implementation & Logic -->
+                <div class="tech-input-row">
+                    <div class="tech-label">
+                        Implementation & Logic
+                        <span class="tooltip">Code complexity and business logic depth.</span>
+                    </div>
+                    <div class="segment-control">
+                        ${renderSegmentOptions(rowIndex, 'impl', implScore)}
+                    </div>
+                </div>
+
+                <!-- Average Display -->
+                <div class="tech-avg-display">
+                    <span>Avg. Technical Effort</span>
+                    <span class="avg-value"><span id="disp-avg-tech">${avgTech}</span> <span class="max">/ 5.0</span></span>
+                </div>
+            </div>
+
+            <!-- Technical Notes -->
+            <div class="details-block">
+                <div class="label">TECHNICAL CONSTRAINTS / NOTES</div>
+                <textarea class="notes-input" placeholder="Add technical constraints or review notes..."
+                    onblur="handleTechNotesChange(${rowIndex}, this.value)">${escapeHtml(techNotes)}</textarea>
+            </div>
+
+            <!-- Real-Time Calculation Card -->
+            <div class="final-score-card">
+                <div class="score-header">
+                    <div class="score-icon">🏁</div>
+                    <div class="score-title">Final Prioritization</div>
+                </div>
+                <div class="score-formula">
+                    (Strategy + Impact) / Tech Effort
+                    <br>
+                    (<span id="formula-strat">${stratScore}</span> + <span id="formula-impact">${impactScore}</span>) / <span id="formula-eff">${avgTech}</span>
+                </div>
+                <div class="score-result" id="disp-final-score">${finalScore}</div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-footer">
+                <button class="btn-reject-outline" onclick="handleProjectDecision(${rowIndex}, 'Rejected')">
+                    🚫 Reject Project
+                </button>
+                <button class="btn-approve-solid" onclick="handleProjectDecision(${rowIndex}, 'Approved')">
+                    ✅ Approve Project
+                </button>
+            </div>
         `;
     }
 
@@ -1664,86 +1698,116 @@
     /**
      * Handle AI Scoring (Simulates AI API call)
      */
-    function handleAiScore(rowIndex) {
-        const btn = document.getElementById('aiScoreBtn');
-        if (!btn) return;
-
-        // Show loading state
-        btn.disabled = true;
-        btn.innerHTML = '<span style="display: inline-block; animation: spin 1s linear infinite;">⏳</span> <span>Analyzing...</span>';
-
-        // Add spin animation
-        const style = document.createElement('style');
-        style.textContent = '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
-        document.head.appendChild(style);
-
-        // Simulate AI API call (1.5 seconds)
-        setTimeout(() => {
-            // Mock AI scores
-            const mockStrategyScore = 10;
-            const mockImpactScore = 10;
-            const mockJustification = 'This project aligns well with integrated functions and service excellence, showing potential for significant impact on client experience and resource deployment. High strategic value confirmed.';
-
-            // Update the row data
-            const updates = {
-                'AI Scored': 'TRUE',
-                'AI Strategy Score': mockStrategyScore,
-                'AI Impact Score': mockImpactScore,
-                'AI Justification': mockJustification
-            };
-
-            updateMultipleFields(rowIndex, updates, function () {
-                // Reload the panel to show new data
-                const row = currentData.rows[rowIndex];
-                const headers = currentData.headers;
-                openDetails(row, headers);
-            });
-        }, 1500);
+    /**
+     * Render 1-5 Segment Control
+     */
+    function renderSegmentOptions(rowIndex, type, currentValue) {
+        let html = '';
+        for (let i = 1; i <= 5; i++) {
+            const activeClass = i === currentValue ? 'active' : '';
+            html += `<button class="segment-btn ${activeClass}" 
+                        onclick="handleScoreChange(${rowIndex}, '${type}', ${i}, this)">${i}</button>`;
+        }
+        return html;
     }
 
     /**
-     * Handle Tech Effort Change
+     * Calculate Average Tech Score
      */
-    function handleTechEffortChange(rowIndex, newEffort) {
-        const row = currentData.rows[rowIndex];
-        const headers = currentData.headers;
+    function calculateAvgTech(scores) {
+        const sum = parseFloat(scores.data) + parseFloat(scores.stake) + parseFloat(scores.impl);
+        return (sum / 3).toFixed(1);
+    }
 
-        // Get AI scores
-        const aiStrategyIndex = headers.indexOf('AI Strategy Score');
-        const aiImpactScoreIndex = headers.indexOf('AI Impact Score');
-        const aiStrategyScore = parseInt(row[aiStrategyIndex]) || 0;
-        const aiImpactScore = parseInt(row[aiImpactScoreIndex]) || 0;
+    /**
+     * Calculate Final Score
+     */
+    function calculateFinalScore(strat, impact, effort) {
+        const num = parseFloat(strat) + parseFloat(impact);
+        const den = parseFloat(effort);
+        if (den === 0) return 0;
+        return (num / den).toFixed(1);
+    }
 
-        // Calculate new final score
-        const finalScore = ((aiStrategyScore + aiImpactScore) / newEffort).toFixed(1);
-
-        // Update local data immediately
-        const techEffortIndex = headers.indexOf('Tech Effort');
-        const finalScoreIndex = headers.indexOf('Final Score');
-        row[techEffortIndex] = newEffort;
-        row[finalScoreIndex] = finalScore;
-
-        // Update the final score display in the panel (without full re-render)
-        const finalScoreDisplay = document.getElementById('finalScoreDisplay');
-        if (finalScoreDisplay) {
-            finalScoreDisplay.textContent = finalScore;
+    /**
+     * Handle ONLY Client-Side UI Updates & Trigger Save
+     * (Debounced to prevent API flooding)
+     */
+    let saveTimeout;
+    function handleScoreChange(rowIndex, type, value, btnElement) {
+        // 1. Update UI Elements immediately
+        if (type === 'strat' || type === 'impact') {
+            document.getElementById(`disp-${type}`).textContent = value;
+            document.getElementById(`formula-${type}`).innerText = value;
         }
 
-        // Update the score in the table row
-        const tableRow = document.querySelector(`tr[data-row-index="${rowIndex}"]`);
-        if (tableRow) {
-            const scoreCell = tableRow.querySelector('td:nth-child(5)'); // Score is 5th column
-            if (scoreCell) {
-                scoreCell.innerHTML = `<span style="font-family: monospace; font-weight: 700; color: var(--slate-700); font-size: 0.875rem;">${finalScore}</span>`;
+        if (type === 'data' || type === 'stake' || type === 'impl') {
+            // Update buttons visual state
+            if (btnElement) {
+                const parent = btnElement.parentElement;
+                parent.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
+                btnElement.classList.add('active');
             }
         }
 
-        // Update database in background
-        const updates = {
-            'Tech Effort': newEffort,
-            'Final Score': finalScore
+        // 2. Gather all current values from DOM (Source of Truth)
+        const strat = parseFloat(document.querySelector('.strat-slider').value);
+        const impact = parseFloat(document.querySelector('.impact-slider').value);
+
+        // Find active buttons for tech scores
+        const getTechVal = (idx) => {
+            const row = document.querySelectorAll('.tech-input-row')[idx];
+            const active = row.querySelector('.segment-btn.active');
+            return active ? parseInt(active.innerText) : 1;
         };
-        updateMultipleFields(rowIndex, updates);
+
+        const dataScore = getTechVal(0);
+        const stakeScore = getTechVal(1);
+        const implScore = getTechVal(2);
+
+        // 3. Re-Calculate
+        const avgTech = calculateAvgTech({ data: dataScore, stake: stakeScore, impl: implScore });
+        const finalScore = calculateFinalScore(strat, impact, avgTech);
+
+        // 4. Update Calculation Card
+        document.getElementById('disp-avg-tech').textContent = avgTech;
+        document.getElementById('formula-eff').innerText = avgTech;
+        document.getElementById('disp-final-score').textContent = finalScore;
+
+        // 5. Update Global Data (optimistic)
+        const row = currentData.rows[rowIndex];
+        const headers = currentData.headers;
+
+        // Helper to safe update if col exists
+        const safeUpdate = (col, val) => {
+            const idx = headers.indexOf(col);
+            if (idx !== -1) row[idx] = val;
+        };
+
+        safeUpdate('Strategy Score', strat);
+        safeUpdate('Impact Score', impact);
+        safeUpdate('Data Score', dataScore);
+        safeUpdate('Stakeholder Score', stakeScore);
+        safeUpdate('Implementation Score', implScore);
+        safeUpdate('Tech Effort', avgTech);
+        safeUpdate('Final Score', finalScore);
+
+        // 6. Debounced Save to Server
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+            const updates = {
+                'Strategy Score': strat,
+                'Impact Score': impact,
+                'Data Score': dataScore,
+                'Stakeholder Score': stakeScore,
+                'Implementation Score': implScore,
+                'Tech Effort': avgTech,
+                'Final Score': finalScore
+            };
+
+            console.log('Saving scores:', updates);
+            updateMultipleFields(rowIndex, updates);
+        }, 1000);
     }
 
     /**
