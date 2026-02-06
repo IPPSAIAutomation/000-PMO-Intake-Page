@@ -583,16 +583,23 @@
             const tr = document.createElement('tr');
             tr.dataset.rowIndex = originalRowIndex;
 
-            // Project Title Column (Clickable to open drawer)
+            // FIX: Attach click handler to the entire row (like Ad Hoc view)
+            tr.style.cursor = 'pointer';
+            tr.onclick = (e) => {
+                // Prevent opening if clicking a button/input inside the row (though currently none exist, good practice)
+                if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+                openDetails(row, headers);
+            };
+
+            // Project Title Column
             const tdTitle = document.createElement('td');
             const title = row[titleIndex] || 'Untitled Project';
             const projectId = `PROJ-${String(originalRowIndex + 1).padStart(3, '0')}`;
 
             tdTitle.innerHTML = `
-                <div class="request-title" style="cursor: pointer; color: var(--blue-600); font-weight: 600;">${escapeHtml(title)}</div>
+                <div class="request-title" style="color: var(--blue-600); font-weight: 600;">${escapeHtml(title)}</div>
                 <div class="request-meta">${projectId}</div>
             `;
-            tdTitle.onclick = () => openDetails(row, headers);
             tr.appendChild(tdTitle);
 
             // Executive Sponsor Column
@@ -613,7 +620,6 @@
 
             // Strategy Score Column
             const tdStrat = document.createElement('td');
-            // Use new column or fallback to AI column
             const stratScore = parseInt(row[stratIndex]) || parseInt(row[aiStrategyIndex]) || 0;
             tdStrat.innerHTML = `<div style="text-align: center; font-weight: 600; color: var(--slate-700);">${stratScore || '-'}</div>`;
             tr.appendChild(tdStrat);
@@ -624,21 +630,24 @@
             tdImpact.innerHTML = `<div style="text-align: center; font-weight: 600; color: var(--slate-700);">${impactScore || '-'}</div>`;
             tr.appendChild(tdImpact);
 
-            // Tech Effort Column (Visual Dots 1-5)
+            // Tech Effort Column (Visual Dots 1-5 + Tooltip)
             const tdEffort = document.createElement('td');
-            const techEffort = parseFloat(row[techEffortIndex]) || 1; // avg 1-5
+            const techEffort = parseFloat(row[techEffortIndex]) || 1;
+            const finalScore = parseFloat(row[finalScoreIndex]) || 0;
+
+            // Tooltip String
+            const tooltipTitle = `Strategy: ${stratScore} | Impact: ${impactScore} | Effort: ${techEffort.toFixed(1)} | Final Score: ${finalScore.toFixed(1)}`;
 
             // Create 5 dots visual
             let dotsHtml = '';
             for (let i = 1; i <= 5; i++) {
-                // Check if active (round to nearest integer for simple visual)
                 const isActive = Math.round(techEffort) >= i;
-                const color = isActive ? '#6366f1' : '#e2e8f0'; // Indigo vs Slate-200
+                const color = isActive ? '#6366f1' : '#e2e8f0';
                 dotsHtml += `<div style="width: 8px; height: 8px; border-radius: 50%; background: ${color};"></div>`;
             }
 
             tdEffort.innerHTML = `
-                <div style="display: flex; flex-direction: column; align-items: start; gap: 0.25rem;">
+                <div style="display: flex; flex-direction: column; align-items: start; gap: 0.25rem;" title="${tooltipTitle}">
                     <div style="display: flex; gap: 4px;">${dotsHtml}</div>
                     <div style="font-size: 0.75rem; color: var(--slate-500); font-family: monospace;">${techEffort.toFixed(1)} / 5</div>
                 </div>
@@ -647,8 +656,6 @@
 
             // Final Score Column
             const tdFinal = document.createElement('td');
-            const finalScore = parseFloat(row[finalScoreIndex]) || 0;
-
             tdFinal.innerHTML = `
                 <div style="font-size: 1.25rem; font-weight: 800; color: var(--slate-900); text-align: right;">
                     ${finalScore > 0 ? finalScore.toFixed(1) : '-'}
