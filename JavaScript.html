@@ -1246,16 +1246,16 @@
                 </div>
             </div>
 
-            <!-- Problem Statement -->
-            <div class="details-block" style="margin-bottom: 1.5rem;">
-                <div class="label">Problem Statement</div>
-                <div class="text-block rich-text">${escapeHtml(problem)}</div>
+            <!-- Problem Statement (Blue Accent Card) -->
+            <div class="detail-card detail-card-blue" style="margin-bottom: 1.5rem;">
+                <div class="card-label">PROBLEM STATEMENT</div>
+                <div class="card-content rich-text">${escapeHtml(problem)}</div>
             </div>
 
-             <!-- Impact Quantification (Moved Below Problem) -->
-            <div class="details-block" style="margin-bottom: 2rem;">
-                <div class="label">Impact Quantification</div>
-                <div class="text-block rich-text">${escapeHtml(impactDesc)}</div>
+             <!-- Impact Quantification (Emerald Accent Card) -->
+            <div class="detail-card detail-card-emerald" style="margin-bottom: 2.5rem;">
+                <div class="card-label">IMPACT QUANTIFICATION</div>
+                <div class="card-content rich-text">${escapeHtml(impactDesc)}</div>
             </div>
 
             <!-- Strategic Assessment (Sliders) -->
@@ -1349,11 +1349,14 @@
                 </div>
             </div>
 
-            <!-- Technical Notes (Improved UI) -->
-            <div class="details-block">
-                <div class="label">TECHNICAL CONSTRAINTS / NOTES</div>
-                <div class="input-wrapper">
-                    <textarea class="notes-input styled-textarea" 
+            <!-- Technical Notes (Styled Container) -->
+            <div class="tech-notes-card">
+                <div class="notes-header">
+                    <span class="icon">📝</span>
+                    TECHNICAL CONSTRAINTS / NOTES
+                </div>
+                <div class="notes-body">
+                    <textarea class="styled-textarea" 
                         placeholder="Add specific technical requirements, limitations, or risk factors..."
                         onblur="handleTechNotesChange(${rowIndex}, this.value)">${escapeHtml(techNotes)}</textarea>
                 </div>
@@ -1371,6 +1374,13 @@
                     (<span id="formula-strat">${stratScore}</span> + <span id="formula-impact">${impactScore}</span>) / <span id="formula-eff">${avgTech}</span>
                 </div>
                 <div class="score-result" id="disp-final-score">${finalScore}</div>
+                
+                <!-- Manual Save Button -->
+                <div style="margin-top: 1rem; text-align: right; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
+                    <button id="btnManualSave" onclick="handleManualSave(${rowIndex})" style="background: var(--blue-600); color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 600; cursor: pointer;">
+                        Save Scoring
+                    </button>
+                </div>
             </div>
 
             <!-- Action Buttons -->
@@ -1827,6 +1837,82 @@
             console.log('Saving scores:', updates);
             updateMultipleFields(rowIndex, updates);
         }, 1000);
+    }
+
+
+    /**
+     * Handle Manual Save & Sync
+     */
+    function handleManualSave(rowIndex) {
+        // Safe version with improved syntax
+        try {
+            clearTimeout(saveTimeout);
+        } catch (e) { }
+
+        var btn = document.getElementById('btnManualSave');
+        if (btn) {
+            btn.textContent = 'Saving...';
+            btn.disabled = true;
+        }
+
+        var stratInput = document.querySelector('.strat-slider');
+        var impactInput = document.querySelector('.impact-slider');
+
+        var strat = stratInput ? parseFloat(stratInput.value) : 0;
+        var impact = impactInput ? parseFloat(impactInput.value) : 0;
+
+        // Helper for tech scores
+        var getTechVal = function (idx) {
+            var row = document.querySelectorAll('.tech-input-row')[idx];
+            if (!row) return 1;
+            var active = row.querySelector('.segment-btn.active');
+            return active ? parseInt(active.innerText) : 1;
+        };
+
+        var dataScore = getTechVal(0);
+        var stakeScore = getTechVal(1);
+        var implScore = getTechVal(2);
+
+        var avgTech = calculateAvgTech({ data: dataScore, stake: stakeScore, impl: implScore });
+        var finalScore = calculateFinalScore(strat, impact, avgTech);
+
+        var updates = {
+            'Strategy Score': strat,
+            'Impact Score': impact,
+            'Data Score': dataScore,
+            'Stakeholder Score': stakeScore,
+            'Implementation Score': implScore,
+            'Tech Effort': avgTech,
+            'Final Score': finalScore
+        };
+
+        updateMultipleFields(rowIndex, updates, function () {
+            if (btn) {
+                btn.textContent = 'Saved!';
+                btn.disabled = false;
+                setTimeout(function () { btn.textContent = 'Save Scoring'; }, 2000);
+            }
+
+            // Update local model
+            if (currentData && currentData.rows && currentData.rows[rowIndex]) {
+                var row = currentData.rows[rowIndex];
+                var headers = currentData.headers;
+                var updateCol = function (col, val) {
+                    var idx = headers.indexOf(col);
+                    if (idx !== -1) row[idx] = val;
+                };
+                updateCol('Strategy Score', strat);
+                updateCol('Impact Score', impact);
+                updateCol('Data Score', dataScore);
+                updateCol('Stakeholder Score', stakeScore);
+                updateCol('Implementation Score', implScore);
+                updateCol('Tech Effort', avgTech);
+                updateCol('Final Score', finalScore);
+            }
+
+            // Reload data to ensure consistency
+            setTimeout(function () { loadData(currentTab); }, 100);
+        });
     }
 
     /**

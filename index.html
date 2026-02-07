@@ -1840,6 +1840,75 @@
         .info-card.full-width {
             width: 100%;
         }
+
+        /* ========================================
+       NEW CARD STYLES
+       ======================================== */
+        .detail-card {
+            background: var(--slate-50);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            border-left: 4px solid transparent;
+        }
+
+        .detail-card-blue {
+            border-left-color: var(--blue-500);
+        }
+
+        .detail-card-emerald {
+            border-left-color: var(--emerald-600);
+        }
+
+        .card-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--slate-500);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .card-content {
+            font-size: 0.875rem;
+            color: var(--slate-700);
+            line-height: 1.6;
+        }
+
+        .tech-notes-card {
+            background: var(--slate-100);
+            border-radius: 0.75rem;
+            overflow: hidden;
+            border: 1px solid var(--slate-200);
+            margin-bottom: 2rem;
+        }
+
+        .notes-header {
+            padding: 0.75rem 1rem;
+            background: var(--slate-200);
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--slate-700);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--slate-300);
+        }
+
+        .notes-body {
+            padding: 1rem;
+        }
+
+        /* Ensure styled-textarea is full width and comfortable */
+        .styled-textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            font-family: inherit;
+            resize: vertical;
+        }
     </style>
     <!-- End of CSS -->
 </head>
