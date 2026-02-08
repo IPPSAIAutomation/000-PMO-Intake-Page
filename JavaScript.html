@@ -228,19 +228,20 @@
                     <th>Project Title</th>
                     <th>Executive Sponsor</th>
                     <th>Status</th>
+                    <th style="text-align: center;">Strategy</th>
+                    <th style="text-align: center;">Impact</th>
                     <th>Tech Effort</th>
-                    <th>AI Strategy</th>
+                    <th style="text-align: right;">Final Score</th>
                 `;
             } else {
                 // roadmap and archive views
                 tableHead.innerHTML = `
-                    <th>PROJECT TITLE</th>
-                    <th>EXEC SPONSOR</th>
-                    <th>STATUS</th>
-                    <th style="text-align: center;">STRATEGY</th>
-                    <th style="text-align: center;">IMPACT</th>
-                    <th>TECH EFFORT</th>
-                    <th style="text-align: right;">FINAL SCORE</th>
+                    <th>Project Title</th>
+                    <th>Executive Sponsor</th>
+                    <th>Status</th>
+                    <th style="text-align: center;">Strategy Score</th>
+                    <th style="text-align: center;">Impact Score</th>
+                    <th style="text-align: right;">Final Score</th>
                 `;
             }
         } else {
@@ -436,31 +437,33 @@
         if (currentTab === 'DB_PROJECTS') {
             if (currentProjectView === 'pending') {
                 tableHead.innerHTML = `
-                    <th>PROJECT TITLE</th>
-                    <th>EXEC SPONSOR</th>
-                    <th>STATUS</th>
-                    <th style="text-align: center;">STRATEGY</th>
-                    <th style="text-align: center;">IMPACT</th>
-                    <th>TECH EFFORT (AVG)</th>
-                    <th style="text-align: right;">FINAL SCORE</th>
+                    <th>Project Title</th>
+                    <th>Executive Sponsor</th>
+                    <th>Status</th>
+                    <th style="text-align: center;">Strategy</th>
+                    <th style="text-align: center;">Impact</th>
+                    <th>Tech Effort (AVG)</th>
+                    <th style="text-align: right;">Final Score</th>
                 `;
             } else {
                 tableHead.innerHTML = `
-                    <th>PROJECT TITLE</th>
-                    <th>EXEC SPONSOR</th>
-                    <th>STATUS</th>
-                    <th style="text-align: right;">FINAL SCORE</th>
+                    <th>Project Title</th>
+                    <th>Executive Sponsor</th>
+                    <th>Status</th>
+                    <th style="text-align: center;">Strategy Score</th>
+                    <th style="text-align: center;">Impact Score</th>
+                    <th style="text-align: right;">Final Score</th>
                 `;
             }
             renderProjectTable(filteredData, data.headers, tableBody);
         } else {
             // Ad Hoc Headers
             tableHead.innerHTML = `
-                <th>REQUEST</th>
-                <th>STATUS</th>
-                <th>ASSIGNEE</th>
-                <th>DEADLINE</th>
-                <th style="width: 48px; text-align: right;">ACTION</th>
+                <th>Request</th>
+                <th>Status</th>
+                <th>Assignee</th>
+                <th>Deadline</th>
+                <th style="width: 48px; text-align: right;">Action</th>
             `;
             renderAdHocTable(filteredData, data.headers, tableBody);
         }
@@ -535,9 +538,6 @@
     /**
      * Render Project Requests Table
      */
-    /**
-     * Render Project Requests Table
-     */
     function renderProjectTable(filteredData, headers, tableBody) {
         // Get column indices
         const titleIndex = headers.indexOf('Project Title');
@@ -603,7 +603,7 @@
                 openDetails(row, headers);
             };
 
-            // Project Title Column
+            // 1. Project Title Column
             const tdTitle = document.createElement('td');
             const title = row[titleIndex] || 'Untitled Project';
             const projectId = `PROJ-${String(originalRowIndex + 1).padStart(3, '0')}`;
@@ -614,13 +614,13 @@
             `;
             tr.appendChild(tdTitle);
 
-            // Executive Sponsor Column
+            // 2. Executive Sponsor Column
             const tdSponsor = document.createElement('td');
             const sponsor = row[sponsorIndex] || 'Unknown';
             tdSponsor.innerHTML = `<span style="color: var(--slate-600); font-size: 0.875rem;">${escapeHtml(sponsor)}</span>`;
             tr.appendChild(tdSponsor);
 
-            // Status Column
+            // 3. Status Column
             const tdStatus = document.createElement('td');
             const status = row[statusIndex] || 'Pending Review';
             if (currentProjectView === 'roadmap' && status === 'In Progress') {
@@ -630,43 +630,45 @@
             }
             tr.appendChild(tdStatus);
 
-            // Strategy Score Column
-            const tdStrat = document.createElement('td');
+            // Fetch Score Values
             const stratScore = parseInt(row[stratIndex]) || parseInt(row[aiStrategyIndex]) || 0;
-            tdStrat.innerHTML = `<div style="text-align: center; font-weight: 600; color: var(--slate-700);">${stratScore || '-'}</div>`;
-            tr.appendChild(tdStrat);
-
-            // Impact Score Column
-            const tdImpact = document.createElement('td');
             const impactScore = parseInt(row[impactIndex]) || parseInt(row[aiImpactIndex]) || 0;
-            tdImpact.innerHTML = `<div style="text-align: center; font-weight: 600; color: var(--slate-700);">${impactScore || '-'}</div>`;
-            tr.appendChild(tdImpact);
-
-            // Tech Effort Column (Visual Dots 1-5 + Tooltip)
-            const tdEffort = document.createElement('td');
             const techEffort = parseFloat(row[techEffortIndex]) || 1;
             const finalScore = parseFloat(row[finalScoreIndex]) || 0;
 
-            // Tooltip String
-            const tooltipTitle = `Strategy: ${stratScore} | Impact: ${impactScore} | Effort: ${techEffort.toFixed(1)} | Final Score: ${finalScore.toFixed(1)}`;
+            // 4. Strategy Score Column
+            const tdStrat = document.createElement('td');
+            tdStrat.innerHTML = `<div style="text-align: center; font-weight: 600; color: var(--slate-700);">${stratScore || '-'}</div>`;
+            tr.appendChild(tdStrat);
 
-            // Create 5 dots visual
-            let dotsHtml = '';
-            for (let i = 1; i <= 5; i++) {
-                const isActive = Math.round(techEffort) >= i;
-                const color = isActive ? '#6366f1' : '#e2e8f0';
-                dotsHtml += `<div style="width: 8px; height: 8px; border-radius: 50%; background: ${color};"></div>`;
+            // 5. Impact Score Column
+            const tdImpact = document.createElement('td');
+            tdImpact.innerHTML = `<div style="text-align: center; font-weight: 600; color: var(--slate-700);">${impactScore || '-'}</div>`;
+            tr.appendChild(tdImpact);
+
+            // 6. Tech Effort Column (ONLY FOR PENDING VIEW)
+            if (currentProjectView === 'pending') {
+                const tdEffort = document.createElement('td');
+                const tooltipTitle = `Strategy: ${stratScore} | Impact: ${impactScore} | Effort: ${techEffort.toFixed(1)} | Final Score: ${finalScore.toFixed(1)}`;
+
+                // Create 5 dots visual
+                let dotsHtml = '';
+                for (let i = 1; i <= 5; i++) {
+                    const isActive = Math.round(techEffort) >= i;
+                    const color = isActive ? '#6366f1' : '#e2e8f0';
+                    dotsHtml += `<div style="width: 8px; height: 8px; border-radius: 50%; background: ${color};"></div>`;
+                }
+
+                tdEffort.innerHTML = `
+                    <div style="display: flex; flex-direction: column; align-items: start; gap: 0.25rem;" title="${tooltipTitle}">
+                        <div style="display: flex; gap: 4px;">${dotsHtml}</div>
+                        <div style="font-size: 0.75rem; color: var(--slate-500); font-family: monospace;">${techEffort.toFixed(1)} / 5</div>
+                    </div>
+                `;
+                tr.appendChild(tdEffort);
             }
 
-            tdEffort.innerHTML = `
-                <div style="display: flex; flex-direction: column; align-items: start; gap: 0.25rem;" title="${tooltipTitle}">
-                    <div style="display: flex; gap: 4px;">${dotsHtml}</div>
-                    <div style="font-size: 0.75rem; color: var(--slate-500); font-family: monospace;">${techEffort.toFixed(1)} / 5</div>
-                </div>
-            `;
-            tr.appendChild(tdEffort);
-
-            // Final Score Column
+            // 7. Final Score Column (For Pending, Roadmap, and Archive)
             const tdFinal = document.createElement('td');
             tdFinal.innerHTML = `
                 <div style="font-size: 1.25rem; font-weight: 800; color: var(--slate-900); text-align: right;">
