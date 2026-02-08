@@ -72,7 +72,10 @@ const CONFIG = {
   TEAM_MEMBERS: [
     'ipalacio@ucsd.edu',
     'k9thomas@UCSD.EDU',
-    'cal050@UCSD.EDU'
+    'cal050@UCSD.EDU',
+    'mdkishore@UCSD.EDU',
+    'raw009@UCSD.EDU',
+    'ngiaquinta@ucsd.edu'
     // TODO: Update this list with your actual team members
   ],
   

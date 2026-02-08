@@ -1433,6 +1433,84 @@
             font-style: italic;
         }
 
+        /* Rubric Table Styles */
+        .rubric-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .rubric-row {
+            display: flex;
+            gap: 1rem;
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--slate-100);
+            align-items: flex-start;
+        }
+
+        .rubric-row:last-child {
+            border-bottom: none;
+        }
+
+        .rubric-row:nth-child(even) {
+            background: var(--slate-50);
+        }
+
+        .rubric-score {
+            min-width: 4rem;
+            font-weight: 700;
+            color: var(--blue-600);
+            text-align: right;
+            font-size: 0.9rem;
+        }
+
+        .rubric-content {
+            flex: 1;
+        }
+
+        .rubric-title {
+            font-weight: 600;
+            color: var(--slate-800);
+            font-size: 0.875rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .rubric-desc {
+            font-size: 0.8rem;
+            color: var(--slate-500);
+            line-height: 1.4;
+        }
+
+        .effort-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+
+        @media (min-width: 768px) {
+            .effort-grid {
+                grid-template-columns: 1fr 1fr 1fr;
+            }
+        }
+
+        .effort-col {
+            background: var(--slate-50);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--slate-200);
+        }
+
+        .effort-col h4 {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--slate-500);
+            margin-bottom: 0.75rem;
+            border-bottom: 2px solid var(--slate-200);
+            padding-bottom: 0.5rem;
+        }
+
         /* ========================================
        STATUS BADGE VARIATIONS
        ======================================== */
@@ -2189,81 +2267,349 @@
     <!-- Scoring Guide Modal -->
     <div id="scoringModal" class="scoring-modal hidden">
         <div class="scoring-modal-backdrop" onclick="toggleScoringModal()"></div>
-        <div class="scoring-modal-content">
+        <div class="scoring-modal-content" style="max-width: 900px; width: 95%; max-height: 85vh;">
             <div class="scoring-modal-header">
-                <h2>📊 Scoring Guide</h2>
+                <h2>📊 Prioritization Scoring Rubric</h2>
                 <button class="btn-close" onclick="toggleScoringModal()">✕</button>
             </div>
             <div class="scoring-modal-body">
+
                 <div class="scoring-section">
-                    <h3>AI Strategy Score (1-10)</h3>
-                    <p>Measures alignment with organizational strategic priorities and long-term goals.</p>
-                    <div class="scoring-scale">
-                        <div class="scoring-scale-item">
-                            <strong>9-10:</strong> Critical strategic alignment, transformational impact
+                    <h3 style="color: var(--purple-700); display:flex; align-items:center; gap:0.5rem;">
+                        🚀 Strategy Score (1-10)
+                    </h3>
+                    <p>Measures alignment with Strategic Goals & Scope. <strong>Scope is the primary driver.</strong>
+                    </p>
+
+                    <div class="rubric-container" style="border: 1px solid var(--purple-100); border-radius: 0.5rem;">
+                        <div class="rubric-row">
+                            <div class="rubric-score">10</div>
+                            <div class="rubric-content">
+                                <div class="rubric-title">Strategic Transformation</div>
+                                <div class="rubric-desc"><strong>Org-Wide.</strong> Fundamental shift in operations.
+                                    Critical to the success of the 5-year Strategic Plan.</div>
+                            </div>
                         </div>
-                        <div class="scoring-scale-item">
-                            <strong>7-8:</strong> Strong strategic value, significant advancement
+                        <div class="rubric-row">
+                            <div class="rubric-score">9</div>
+                            <div class="rubric-content">
+                                <div class="rubric-title">Enterprise Enabler</div>
+                                <div class="rubric-desc"><strong>Org-Wide.</strong> Foundational system (e.g., AI,
+                                    Knowledge Hub). Supports 3+ Strategic Goals.</div>
+                            </div>
                         </div>
-                        <div class="scoring-scale-item">
-                            <strong>5-6:</strong> Moderate strategic benefit, supports key initiatives
+                        <div class="rubric-row">
+                            <div class="rubric-score">8</div>
+                            <div class="rubric-content">
+                                <div class="rubric-title">Divisional Pillar</div>
+                                <div class="rubric-desc"><strong>Major Division.</strong> Critical component of the plan
+                                    (e.g., Divisional Dashboard). Aligns with 2+ Goals.</div>
+                            </div>
                         </div>
-                        <div class="scoring-scale-item">
-                            <strong>3-4:</strong> Minor strategic value, tangential alignment
+                        <div class="rubric-row">
+                            <div class="rubric-score">6-7</div>
+                            <div class="rubric-content">
+                                <div class="rubric-title">Cross-Functional</div>
+                                <div class="rubric-desc"><strong>Multi-Unit.</strong> Connects silos (e.g., Dining +
+                                    Housing) or standardizes a shared process. Aligns with 1-2 Goals.</div>
+                            </div>
                         </div>
-                        <div class="scoring-scale-item">
-                            <strong>1-2:</strong> Minimal strategic impact, operational only
+                        <div class="rubric-row">
+                            <div class="rubric-score">4-5</div>
+                            <div class="rubric-content">
+                                <div class="rubric-title">Unit Optimization</div>
+                                <div class="rubric-desc"><strong>Single Unit (Deep Dive).</strong> Creates a "pilot" or
+                                    model that could be replicated. Strongly aligns with 1 Goal.</div>
+                            </div>
+                        </div>
+                        <div class="rubric-row">
+                            <div class="rubric-score">2-3</div>
+                            <div class="rubric-content">
+                                <div class="rubric-title">Local Fix</div>
+                                <div class="rubric-desc"><strong>Single Unit.</strong> Solves a localized pain point.
+                                    Cannot be scaled. Loosely connects to 1 Goal.</div>
+                            </div>
+                        </div>
+                        <div class="rubric-row">
+                            <div class="rubric-score">1</div>
+                            <div class="rubric-content">
+                                <div class="rubric-title">Misaligned</div>
+                                <div class="rubric-desc"><strong>Single Unit.</strong> "Nice-to-have" or personal
+                                    preference. No clear strategic link.</div>
+                            </div>
                         </div>
                     </div>
                 </div>
+
                 <div class="scoring-section">
-                    <h3>AI Impact Score (1-10)</h3>
-                    <p>Quantifies the expected business impact and value delivered.</p>
-                    <div class="scoring-scale">
-                        <div class="scoring-scale-item">
-                            <strong>9-10:</strong> Enterprise-wide impact, major efficiency gains
+                    <h3 style="color: var(--blue-700); display:flex; align-items:center; gap:0.5rem;">
+                        💎 Impact Score (1-10)
+                    </h3>
+                    <p>Measures business value. <strong>Efficiency (Time Savings) is capped at 7.</strong> Higher scores
+                        require hard revenue.</p>
+
+                    <div class="rubric-container" style="border: 1px solid var(--blue-100); border-radius: 0.5rem;">
+                        <div class="rubric-row">
+                            <div class="rubric-score">10</div>
+                            <div class="rubric-content">
+                                <div class="rubric-title">Enterprise Value ($100k+)</div>
+                                <div class="rubric-desc">Major financial impact. Critical to solvency or massive cost
+                                    restructuring.</div>
+                            </div>
                         </div>
-                        <div class="scoring-scale-item">
-                            <strong>7-8:</strong> Department-level impact, measurable improvements
+                        <div class="rubric-row">
+                            <div class="rubric-score">9</div>
+                            <div class="rubric-content">
+                                <div class="rubric-title">Revenue Growth ($50k - $100k)</div>
+                                <div class="rubric-desc">Strategic investment or new business line (e.g., Summer
+                                    Housing).</div>
+                            </div>
                         </div>
-                        <div class="scoring-scale-item">
-                            <strong>5-6:</strong> Team-level impact, noticeable benefits
+                        <div class="rubric-row">
+                            <div class="rubric-score">8</div>
+                            <div class="rubric-content">
+                                <div class="rubric-title">Financial Health ($10k - $50k)</div>
+                                <div class="rubric-desc">Direct financial savings, waste reduction, or budget
+                                    optimization.</div>
+                            </div>
                         </div>
-                        <div class="scoring-scale-item">
-                            <strong>3-4:</strong> Individual-level impact, incremental value
+                        <div class="rubric-row" style="background: #f0f9ff; border-left: 4px solid var(--blue-500);">
+                            <div class="rubric-score">7</div>
+                            <div class="rubric-content">
+                                <div class="rubric-title">Operational Transformation (CAP)</div>
+                                <div class="rubric-desc"><strong>Maximum Efficiency Score.</strong> Saves full FTE
+                                    capacity (40+ hrs/week) or revolutionizes workflow.</div>
+                            </div>
                         </div>
-                        <div class="scoring-scale-item">
-                            <strong>1-2:</strong> Minimal impact, limited scope
+                        <div class="rubric-row">
+                            <div class="rubric-score">5-6</div>
+                            <div class="rubric-content">
+                                <div class="rubric-title">Process Efficiency</div>
+                                <div class="rubric-desc">Saves significant hours (10-20+ hrs/week). Frees up staff
+                                    capacity.</div>
+                            </div>
+                        </div>
+                        <div class="rubric-row">
+                            <div class="rubric-score">3-4</div>
+                            <div class="rubric-content">
+                                <div class="rubric-title">Task Efficiency</div>
+                                <div class="rubric-desc">Saves < 5 hours/week. Automates a single manual report or minor
+                                        annoyance.</div>
+                                </div>
+                            </div>
+                            <div class="rubric-row">
+                                <div class="rubric-score">1-2</div>
+                                <div class="rubric-content">
+                                    <div class="rubric-title">Informational</div>
+                                    <div class="rubric-desc">"Nice to know." No measurable savings. Confirms existing
+                                        knowledge.</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div class="scoring-section">
-                    <h3>Tech Effort (1-3)</h3>
-                    <p>Estimates the technical complexity and resource requirements.</p>
-                    <div class="scoring-scale">
-                        <div class="scoring-scale-item">
-                            <strong>1 (Low):</strong> Simple implementation, existing tools, &lt;1 week
-                        </div>
-                        <div class="scoring-scale-item">
-                            <strong>2 (Medium):</strong> Moderate complexity, some custom work, 1-4 weeks
-                        </div>
-                        <div class="scoring-scale-item">
-                            <strong>3 (High):</strong> Complex integration, significant development, &gt;4 weeks
+
+                    <div class="scoring-section">
+                        <h3 style="color: var(--slate-700); display:flex; align-items:center; gap:0.5rem;">
+                            ⚙️ Technical Effort (1-5)
+                        </h3>
+                        <p>Average of three technical dimensions.</p>
+
+                        <div class="effort-grid">
+                            <div class="effort-col">
+                                <h4>💾 Data & Infra <span
+                                        style="display:block; font-weight:400; font-size:0.7em; color:var(--slate-400); margin-top:0.25rem;">The
+                                        "Hidden" Work</span></h4>
+
+                                <div class="rubric-row"
+                                    style="padding: 0.75rem 0; border-bottom: 1px solid var(--slate-200); background: transparent;">
+                                    <div class="rubric-score"
+                                        style="min-width: 1.5rem; text-align: left; font-size: 1rem;">1</div>
+                                    <div class="rubric-content">
+                                        <div class="rubric-title">Plug-and-Play</div>
+                                        <div class="rubric-desc">Data exists, is clean, and is already in the data
+                                            warehouse. No new pipelines needed.</div>
+                                    </div>
+                                </div>
+
+                                <div class="rubric-row"
+                                    style="padding: 0.75rem 0; border-bottom: 1px solid var(--slate-200); background: transparent;">
+                                    <div class="rubric-score"
+                                        style="min-width: 1.5rem; text-align: left; font-size: 1rem;">2</div>
+                                    <div class="rubric-content">
+                                        <div class="rubric-title">Minor Prep</div>
+                                        <div class="rubric-desc">Data exists but needs light cleaning or a simple
+                                            calculated view.</div>
+                                    </div>
+                                </div>
+
+                                <div class="rubric-row"
+                                    style="padding: 0.75rem 0; border-bottom: 1px solid var(--slate-200); background: transparent;">
+                                    <div class="rubric-score"
+                                        style="min-width: 1.5rem; text-align: left; font-size: 1rem;">3</div>
+                                    <div class="rubric-content">
+                                        <div class="rubric-title">New Modeling</div>
+                                        <div class="rubric-desc">Requires joining 2+ disparate data sources or building
+                                            a new data model.</div>
+                                    </div>
+                                </div>
+
+                                <div class="rubric-row"
+                                    style="padding: 0.75rem 0; border-bottom: 1px solid var(--slate-200); background: transparent;">
+                                    <div class="rubric-score"
+                                        style="min-width: 1.5rem; text-align: left; font-size: 1rem;">4</div>
+                                    <div class="rubric-content">
+                                        <div class="rubric-title">Heavy Engineering</div>
+                                        <div class="rubric-desc">Requires new pipelines (ETL/ELT), API integrations, or
+                                            fixing significant data quality issues.</div>
+                                    </div>
+                                </div>
+
+                                <div class="rubric-row"
+                                    style="padding: 0.75rem 0; border: none; background: transparent;">
+                                    <div class="rubric-score"
+                                        style="min-width: 1.5rem; text-align: left; font-size: 1rem;">5</div>
+                                    <div class="rubric-content">
+                                        <div class="rubric-title">Architectural Change</div>
+                                        <div class="rubric-desc">Requires new infrastructure, massive historical data
+                                            migration, or real-time data streaming.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="effort-col">
+                                <h4>👥 Stakeholder & Scope <span
+                                        style="display:block; font-weight:400; font-size:0.7em; color:var(--slate-400); margin-top:0.25rem;">The
+                                        "People" Work</span></h4>
+
+                                <div class="rubric-row"
+                                    style="padding: 0.75rem 0; border-bottom: 1px solid var(--slate-200); background: transparent;">
+                                    <div class="rubric-score"
+                                        style="min-width: 1.5rem; text-align: left; font-size: 1rem;">1</div>
+                                    <div class="rubric-content">
+                                        <div class="rubric-title">Single Point of Contact</div>
+                                        <div class="rubric-desc">One stakeholder or one unified team. Requirements are
+                                            fixed.</div>
+                                    </div>
+                                </div>
+
+                                <div class="rubric-row"
+                                    style="padding: 0.75rem 0; border-bottom: 1px solid var(--slate-200); background: transparent;">
+                                    <div class="rubric-score"
+                                        style="min-width: 1.5rem; text-align: left; font-size: 1rem;">2</div>
+                                    <div class="rubric-content">
+                                        <div class="rubric-title">Single Department</div>
+                                        <div class="rubric-desc">Small group of users with aligned goals.</div>
+                                    </div>
+                                </div>
+
+                                <div class="rubric-row"
+                                    style="padding: 0.75rem 0; border-bottom: 1px solid var(--slate-200); background: transparent;">
+                                    <div class="rubric-score"
+                                        style="min-width: 1.5rem; text-align: left; font-size: 1rem;">3</div>
+                                    <div class="rubric-content">
+                                        <div class="rubric-title">Cross-Functional</div>
+                                        <div class="rubric-desc">Multiple teams involved (e.g., Finance + Ops). Requires
+                                            some requirement negotiation.</div>
+                                    </div>
+                                </div>
+
+                                <div class="rubric-row"
+                                    style="padding: 0.75rem 0; border-bottom: 1px solid var(--slate-200); background: transparent;">
+                                    <div class="rubric-score"
+                                        style="min-width: 1.5rem; text-align: left; font-size: 1rem;">4</div>
+                                    <div class="rubric-content">
+                                        <div class="rubric-title">Multi-Dept / Executive</div>
+                                        <div class="rubric-desc">High visibility. Stakeholders have conflicting
+                                            definitions that need resolving.</div>
+                                    </div>
+                                </div>
+
+                                <div class="rubric-row"
+                                    style="padding: 0.75rem 0; border: none; background: transparent;">
+                                    <div class="rubric-score"
+                                        style="min-width: 1.5rem; text-align: left; font-size: 1rem;">5</div>
+                                    <div class="rubric-content">
+                                        <div class="rubric-title">Enterprise-Wide</div>
+                                        <div class="rubric-desc">Affects the whole organization. High political risk or
+                                            regulatory requirements.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="effort-col">
+                                <h4>🔨 Implementation <span
+                                        style="display:block; font-weight:400; font-size:0.7em; color:var(--slate-400); margin-top:0.25rem;">The
+                                        "Build" Work</span></h4>
+
+                                <div class="rubric-row"
+                                    style="padding: 0.75rem 0; border-bottom: 1px solid var(--slate-200); background: transparent;">
+                                    <div class="rubric-score"
+                                        style="min-width: 1.5rem; text-align: left; font-size: 1rem;">1</div>
+                                    <div class="rubric-content">
+                                        <div class="rubric-title">Standard Config</div>
+                                        <div class="rubric-desc">Basic visualization or report using standard templates.
+                                            No complex calculations.</div>
+                                    </div>
+                                </div>
+
+                                <div class="rubric-row"
+                                    style="padding: 0.75rem 0; border-bottom: 1px solid var(--slate-200); background: transparent;">
+                                    <div class="rubric-score"
+                                        style="min-width: 1.5rem; text-align: left; font-size: 1rem;">2</div>
+                                    <div class="rubric-content">
+                                        <div class="rubric-title">Enhanced Standard</div>
+                                        <div class="rubric-desc">Dashboard with some custom filters or basic trend
+                                            lines.</div>
+                                    </div>
+                                </div>
+
+                                <div class="rubric-row"
+                                    style="padding: 0.75rem 0; border-bottom: 1px solid var(--slate-200); background: transparent;">
+                                    <div class="rubric-score"
+                                        style="min-width: 1.5rem; text-align: left; font-size: 1rem;">3</div>
+                                    <div class="rubric-content">
+                                        <div class="rubric-title">Custom Logic</div>
+                                        <div class="rubric-desc">New dashboard with complex KPIs, basic forecasting
+                                            (linear), or light scripting.</div>
+                                    </div>
+                                </div>
+
+                                <div class="rubric-row"
+                                    style="padding: 0.75rem 0; border-bottom: 1px solid var(--slate-200); background: transparent;">
+                                    <div class="rubric-score"
+                                        style="min-width: 1.5rem; text-align: left; font-size: 1rem;">4</div>
+                                    <div class="rubric-content">
+                                        <div class="rubric-title">Advanced Modeling</div>
+                                        <div class="rubric-desc">Scenario modeling ("What-if" analysis), complex
+                                            forecasting variables, or custom app development.</div>
+                                    </div>
+                                </div>
+
+                                <div class="rubric-row"
+                                    style="padding: 0.75rem 0; border: none; background: transparent;">
+                                    <div class="rubric-score"
+                                        style="min-width: 1.5rem; text-align: left; font-size: 1rem;">5</div>
+                                    <div class="rubric-content">
+                                        <div class="rubric-title">Novel Solution</div>
+                                        <div class="rubric-desc">Machine Learning implementation, predictive AI, or
+                                            fully custom software development.</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div class="scoring-formula">
-                    <h3>Final Prioritization Score</h3>
-                    <p class="formula">Final Score = (AI Strategy Score + AI Impact Score) / Tech Effort</p>
-                    <p class="formula-note">Higher scores indicate higher priority projects that deliver maximum value
-                        with optimal resource investment.</p>
+
+                    <div class="scoring-formula" style="margin-top: 1.5rem;">
+                        <h3>Final Prioritization Score</h3>
+                        <p class="formula">Final Score = (AI Strategy Score + AI Impact Score) / Tech Effort Avg</p>
+                        <p class="formula-note">Higher scores indicate higher priority.</p>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Include JavaScript -->
-    <?!= include('JavaScript'); ?>
+        <!-- Include JavaScript -->
+        <?!= include('JavaScript'); ?>
 </body>
 
 </html>
