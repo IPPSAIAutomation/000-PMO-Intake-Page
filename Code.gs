@@ -484,3 +484,159 @@ function testFormSubmit() {
   handleFormSubmit(mockEvent);
   Logger.log('Test completed - check DB_ADHOCS sheet');
 }
+
+// ========================================
+// AI SCORING FEATURES
+// ========================================
+
+/**
+ * Assess project with AI
+ * Called by frontend
+ * @param {number} rowIndex - Row index in DB_PROJECTS
+ * @returns {Object} Evaluation results
+ */
+function assessProjectWithAI(rowIndex) {
+  const sheet = getSheet(CONFIG.SHEETS.DB_PROJECTS);
+  
+  // Fetch Headers to find indices
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  
+  // Helper to get value
+  const getValue = (colName) => {
+    const colIndex = headers.indexOf(colName);
+    if (colIndex === -1) return '';
+    return sheet.getRange(rowIndex + 1, colIndex + 1).getValue();
+  };
+
+  // Extract Data
+  const data = {
+    problemStatement: getValue('Problem Statement'),
+    strategicAlignment: getValue('Strategic Alignment'),
+    impactQuantification: getValue('Impact Quantification'),
+    crossFunctionalImpact: getValue('Cross-Functional Impact'),
+    decisionsActions: getValue('Decisions & Actions'),
+    targetAudience: getValue('Target Audience')
+  };
+
+  // Call OpenAI
+  const aiResponse = callOpenAI(data);
+  
+  if (!aiResponse) {
+    throw new Error("Failed to get response from AI");
+  }
+
+  // Parse Response
+  let result;
+  try {
+     result = JSON.parse(aiResponse);
+  } catch (e) {
+     console.error("Failed to parse AI response", aiResponse);
+     throw new Error("Invalid response format from AI");
+  }
+  
+  // Save scores to sheet
+  const stratCol = headers.indexOf('Strategy Score');
+  const impactCol = headers.indexOf('Impact Score');
+  
+  // Create columns if they don't exist (Optional, but good practice if safe)
+  // For now, assume they exist or we skip saving if not found
+  if (stratCol !== -1) sheet.getRange(rowIndex + 1, stratCol + 1).setValue(result.strat_score);
+  if (impactCol !== -1) sheet.getRange(rowIndex + 1, impactCol + 1).setValue(result.impact_score);
+  
+  return result;
+}
+
+/**
+ * Call OpenAI API
+ * @param {Object} data - Project data
+ * @returns {string} JSON response string
+ */
+function callOpenAI(data) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY');
+  if (!apiKey) throw new Error('OpenAI API Key not found in Script Properties');
+
+  const systemPrompt = `
+ROLE:
+You are an expert PMO Governance AI for the Residential, Retail, and Supply Chain Services (RRSS) at UC San Diego. Your job is to objectively evaluate project requests against the 2025-2030 Strategic Plan and assign prioritization scores based on strict governance rubrics.
+
+CONTEXT - STRATEGIC GOALS:
+1. Integrated Functions (Unified org, cross-unit synergies)
+2. Process Improvement (Streamline, AI & automation)
+3. People Experience (Culture, well-being, retention)
+4. Financial Sustainability (Revenue, cost reduction)
+5. Service Excellence (Client-centered, community well-being)
+
+SCORING RUBRIC 1: STRATEGY SCORE (1-10)
+*Rule: Scope is the primary driver.*
+- Score 1 (Misaligned): Single Unit. No clear link to goals.
+- Score 2-3 (Local Fix): Single Unit. Loosely aligns with 1 Goal.
+- Score 4-5 (Unit Optimization): Single Unit. Strong alignment (Pilot/Deep Dive).
+- Score 6-7 (Cross-Functional): Multi-Unit. Aligns with 1-2 Goals. Connects silos.
+- Score 8 (Divisional Pillar): Major Division impact. Aligns with 2+ Goals.
+- Score 9 (Enterprise Enabler): Org-Wide foundation (e.g., AI Implementation).
+- Score 10 (Transformation): Critical to 5-year plan success.
+
+SCORING RUBRIC 2: IMPACT SCORE (1-10)
+*Rule: Efficiency is Capped at 7. Scores 8-10 require Hard Dollar ROI.*
+- Score 1-2 (Informational): "Nice to know." No measurable savings.
+- Score 3-4 (Task Efficiency): Saves <5 hours/week. Minor tactical adjustments.
+- Score 5-6 (Process Efficiency): Saves 10-20+ hours/week. Frees staff capacity.
+- Score 7 (Operational Transformation - CAP): Maximum Efficiency (40+ hrs/week). Stops here if no hard revenue.
+- Score 8 (Financial Health): Direct Financial Impact ($10k - $50k).
+- Score 9 (Revenue Growth): Significant Impact ($50k - $100k).
+- Score 10 (Enterprise Value): Major Impact ($100k+). Critical to solvency.
+
+OUTPUT FORMAT (JSON):
+{
+  "strat_score": number,
+  "impact_score": number,
+  "strategy_justification": "Short explanation referencing scope/goals.",
+  "impact_justification": "Short explanation referencing the efficiency cap or revenue."
+}
+`;
+
+  const userMessage = `
+Project Data:
+- Problem: ${data.problemStatement}
+- Strategic Alignment: ${data.strategicAlignment}
+- Impact: ${data.impactQuantification}
+- Cross-Functional: ${data.crossFunctionalImpact}
+- Decisions: ${data.decisionsActions}
+- Audience: ${data.targetAudience}
+
+Please score this project.
+`;
+
+  const payload = {
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage }
+    ],
+    temperature: 0.2,
+    response_format: { type: "json_object" }
+  };
+
+  const options = {
+    method: "post",
+    contentType: "application/json",
+    headers: { "Authorization": "Bearer " + apiKey },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch("https://api.openai.com/v1/chat/completions", options);
+    const json = JSON.parse(response.getContentText());
+    
+    if (json.error) {
+      Logger.log("OpenAI Error: " + JSON.stringify(json.error));
+      throw new Error(json.error.message);
+    }
+    
+    return json.choices[0].message.content;
+  } catch (e) {
+    Logger.log("Fetch Error: " + e.toString());
+    throw e;
+  }
+}

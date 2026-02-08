@@ -1362,6 +1362,33 @@
                 </div>
 
                 <!-- Strategic Assessment (Sliders) -->
+                
+                <!-- AI Scoring Button -->
+                <button 
+                    id="btn-ai-score-${rowIndex}"
+                    onclick="handleAIScoring(${rowIndex})"
+                    style="
+                        width: 100%; 
+                        padding: 0.75rem; 
+                        margin-bottom: 1.5rem; 
+                        background: #7e22ce; 
+                        color: white; 
+                        border: none; 
+                        border-radius: 0.5rem; 
+                        font-weight: 600; 
+                        cursor: pointer; 
+                        display: flex; 
+                        align-items: center; 
+                        justify-content: center; 
+                        gap: 0.5rem;
+                        transition: background 0.2s;
+                    "
+                    onmouseover="this.style.background='#6b21a8'"
+                    onmouseout="this.style.background='#7e22ce'"
+                >
+                    <span style="font-size: 1.25rem;">✨</span> Let AI score this project
+                </button>
+
                 <div class="divider-title">
                     <span class="icon">📊</span> STRATEGIC ASSESSMENT
                 </div>
@@ -1590,6 +1617,83 @@
             closeDetails();
             setTimeout(() => loadData(currentTab), 300);
         });
+    }
+
+    /**
+     * Handle AI Scoring
+     */
+    function handleAIScoring(rowIndex) {
+        const btn = document.getElementById(`btn-ai-score-${rowIndex}`);
+        const originalText = btn.innerHTML;
+
+        // 1. Change State
+        btn.innerHTML = '<span class="spinner"></span> Analyzing...'; // You might need a spinner CSS class, or just text
+        btn.disabled = true;
+        btn.style.opacity = '0.7';
+        btn.style.cursor = 'wait';
+
+        // 2. Call Backend
+        google.script.run
+            .withSuccessHandler(function (result) {
+                console.log('AI Result:', result);
+
+                // 3. Update UI with Results
+
+                // Update Sliders & Text
+                if (result.strat_score) {
+                    // Update input value FIRST so handleScoreChange reads the new value
+                    const stratSlider = document.querySelector('.strat-slider');
+                    if (stratSlider) {
+                        stratSlider.value = result.strat_score;
+                        handleScoreChange(rowIndex, 'strat', result.strat_score);
+                    }
+                }
+
+                if (result.impact_score) {
+                    const impactSlider = document.querySelector('.impact-slider');
+                    if (impactSlider) {
+                        impactSlider.value = result.impact_score;
+                        handleScoreChange(rowIndex, 'impact', result.impact_score);
+                    }
+                }
+
+                // Insert Rationale into Technical Constraint/Notes or a new field?
+                // User said: "inserts the AI's "Rationale" into the "TECHNICAL CONSTRAINTS / NOTES" textarea (or a new dedicated field if preferred)."
+                // I'll append it to Notes for now as it's easier.
+                const notesArea = document.querySelector('.styled-textarea');
+                if (notesArea) {
+                    const rationale = `[AI ASSESSMENT]\nStrategy (${result.strat_score}): ${result.strategy_justification}\nImpact (${result.impact_score}): ${result.impact_justification}\n\n`;
+                    notesArea.value = rationale + notesArea.value;
+                    handleTechNotesChange(rowIndex, notesArea.value); // Save to backend
+                }
+
+                // 4. Reset Button
+                btn.innerHTML = '✅ Analysis Complete';
+                btn.style.background = '#10b981'; // Green
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    btn.style.cursor = 'pointer';
+                    btn.style.background = '#7e22ce'; // Back to purple
+                }, 3000);
+            })
+            .withFailureHandler(function (error) {
+                console.error('AI Error:', error);
+                showError('AI Assessment failed: ' + error.message);
+
+                // Reset Button
+                btn.innerHTML = '❌ Error';
+                btn.style.background = '#ef4444'; // Red
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    btn.style.cursor = 'pointer';
+                    btn.style.background = '#7e22ce';
+                }, 3000);
+            })
+            .assessProjectWithAI(rowIndex);
     }
 
     /**
