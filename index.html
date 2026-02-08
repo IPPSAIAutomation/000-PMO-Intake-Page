@@ -1909,6 +1909,112 @@
             font-family: inherit;
             resize: vertical;
         }
+
+        /* ========================================
+       PENDING VIEW LAYOUT (3-Column)
+       ======================================== */
+        .main-content.pending-layout {
+            display: grid;
+            grid-template-areas:
+                "topbar topbar"
+                "filters filters"
+                "middle details";
+            grid-template-columns: 1fr 450px;
+            /* Fixed width for details */
+            grid-template-rows: auto auto auto 1fr;
+            overflow: hidden;
+        }
+
+        .main-content.pending-layout .top-bar {
+            grid-area: topbar;
+        }
+
+        .main-content.pending-layout .filters-bar {
+            grid-area: filters;
+        }
+
+        .main-content.pending-layout #matrixContainer {
+            grid-column: 1;
+            grid-row: 3;
+            margin: 1.5rem 1.5rem 0 1.5rem;
+            height: auto;
+            /* Allow it to fit content */
+            max-height: 450px;
+            /* constrain height */
+        }
+
+        .main-content.pending-layout .matrix-grid {
+            height: 300px;
+            /* Smaller height for "Cockpit" view */
+        }
+
+        .main-content.pending-layout #dataGridSection {
+            grid-column: 1;
+            grid-row: 4;
+            overflow-y: auto;
+            padding-top: 1rem;
+        }
+
+        .main-content.pending-layout .details-panel {
+            grid-row: 3 / span 2;
+            grid-column: 2;
+            position: relative;
+            /* Override absolute */
+            top: auto;
+            right: auto;
+            height: 100%;
+            width: 100%;
+            transform: none !important;
+            /* Force visible */
+            border-left: 1px solid var(--slate-200);
+            box-shadow: none;
+            z-index: 10;
+            background: white;
+        }
+
+        /* Matrix Reference Bubbles (Ghost) */
+        .matrix-bubble.reference {
+            background: #cbd5e1;
+            /* Slate 300 */
+            border-color: #94a3b8;
+            /* Slate 400 */
+            opacity: 0.5;
+            z-index: 1;
+            filter: grayscale(100%);
+        }
+
+        .matrix-bubble.reference:hover {
+            opacity: 0.8;
+            z-index: 5;
+        }
+
+        /* Matrix Active Highlight */
+        .matrix-bubble.active-highlight {
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.4);
+            z-index: 20;
+            animation: pulse 1.5s infinite;
+            border-color: white;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+            }
+        }
+
+        /* Table Row Highlight */
+        tr.highlight-row {
+            background-color: var(--blue-50) !important;
+            border-left: 3px solid var(--blue-500);
+        }
     </style>
     <!-- End of CSS -->
 </head>
